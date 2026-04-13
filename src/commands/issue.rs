@@ -85,6 +85,7 @@ pub fn show(db: &Database, id: i64) -> Result<IssueDetail> {
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn update(
     db: &Database,
     id: i64,
@@ -93,6 +94,7 @@ pub fn update(
     issue_type: Option<&str>,
     priority: Option<&str>,
     parent_id: Option<i64>,
+    expect_version: Option<i64>,
 ) -> Result<Issue> {
     let itype = issue_type
         .map(|s| s.parse::<IssueType>().map_err(TickError::InvalidArgument))
@@ -119,10 +121,11 @@ pub fn update(
         itype.as_ref(),
         prio.as_ref(),
         parent_opt,
+        expect_version,
     )
 }
 
-pub fn start(db: &Database, id: i64, branch: &str) -> Result<Issue> {
+pub fn start(db: &Database, id: i64, branch: &str, expect_version: Option<i64>) -> Result<Issue> {
     validators::validate_start(db, id, branch)?;
     db.update_issue_status_atomic(
         id,
@@ -132,10 +135,11 @@ pub fn start(db: &Database, id: i64, branch: &str) -> Result<Issue> {
         Some(Some(branch)),
         false,
         false,
+        expect_version,
     )
 }
 
-pub fn done(db: &Database, id: i64) -> Result<Issue> {
+pub fn done(db: &Database, id: i64, expect_version: Option<i64>) -> Result<Issue> {
     db.update_issue_status_atomic(
         id,
         &IssueStatus::InProgress,
@@ -144,6 +148,7 @@ pub fn done(db: &Database, id: i64) -> Result<Issue> {
         None,
         false,
         false,
+        expect_version,
     )
 }
 
@@ -153,6 +158,7 @@ pub fn close(
     comment: Option<&str>,
     role: &str,
     resolution: &str,
+    expect_version: Option<i64>,
 ) -> Result<Issue> {
     let res = resolution
         .parse::<Resolution>()
@@ -172,6 +178,7 @@ pub fn close(
         None,
         false,
         false,
+        expect_version,
     )?;
 
     if let Some(body) = comment {
@@ -204,7 +211,7 @@ pub fn unlink(db: &Database, from_id: i64, to_id: i64) -> Result<serde_json::Val
     Ok(serde_json::json!({"unlinked": true, "from": from_id, "to": to_id}))
 }
 
-pub fn reopen(db: &Database, id: i64) -> Result<Issue> {
+pub fn reopen(db: &Database, id: i64, expect_version: Option<i64>) -> Result<Issue> {
     db.update_issue_status_atomic(
         id,
         &IssueStatus::Closed,
@@ -213,5 +220,6 @@ pub fn reopen(db: &Database, id: i64) -> Result<Issue> {
         None,
         true,
         true,
+        expect_version,
     )
 }

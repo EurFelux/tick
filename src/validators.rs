@@ -160,6 +160,7 @@ pub fn cascade_wontfix(db: &Database, wontfixed_issue_id: i64) -> Result<()> {
             None,
             false,
             false,
+            None,
         )?;
 
         db.create_comment(

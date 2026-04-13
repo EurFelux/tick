@@ -924,3 +924,69 @@ fn test_cascade_wontfix() {
         .success()
         .stdout(predicate::str::contains("Closed by cascade: dependency #1 was abandoned"));
 }
+
+#[test]
+fn test_expect_version_correct() {
+    let (_dir, db_path) = setup();
+
+    tick()
+        .args([
+            "--db", &db_path, "issue", "create", "Version test", "--type", "bug",
+        ])
+        .assert()
+        .success();
+
+    // version after create is 1
+    tick()
+        .args([
+            "--db", &db_path, "issue", "update", "1", "--title", "Updated title",
+            "--expect-version", "1",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"title\":\"Updated title\""));
+}
+
+#[test]
+fn test_expect_version_wrong() {
+    let (_dir, db_path) = setup();
+
+    tick()
+        .args([
+            "--db", &db_path, "issue", "create", "Version conflict test", "--type", "bug",
+        ])
+        .assert()
+        .success();
+
+    // version is 1, but we pass 999 — should fail with CONFLICT (exit 6)
+    tick()
+        .args([
+            "--db", &db_path, "issue", "update", "1", "--title", "Should fail",
+            "--expect-version", "999",
+        ])
+        .assert()
+        .failure()
+        .code(6)
+        .stderr(predicate::str::contains("CONFLICT"));
+}
+
+#[test]
+fn test_expect_version_not_provided() {
+    let (_dir, db_path) = setup();
+
+    tick()
+        .args([
+            "--db", &db_path, "issue", "create", "No version flag test", "--type", "bug",
+        ])
+        .assert()
+        .success();
+
+    // No --expect-version flag — should succeed normally
+    tick()
+        .args([
+            "--db", &db_path, "issue", "update", "1", "--title", "New title",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"title\":\"New title\""));
+}

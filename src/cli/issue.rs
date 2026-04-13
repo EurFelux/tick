@@ -85,6 +85,10 @@ pub enum IssueCommands {
         /// New parent ID
         #[arg(long)]
         parent: Option<i64>,
+
+        /// Expected version for optimistic locking
+        #[arg(long)]
+        expect_version: Option<i64>,
     },
 
     /// Start working on an issue
@@ -95,12 +99,20 @@ pub enum IssueCommands {
         /// Branch name
         #[arg(long, required = true)]
         branch: String,
+
+        /// Expected version for optimistic locking
+        #[arg(long)]
+        expect_version: Option<i64>,
     },
 
     /// Mark an issue as done
     Done {
         /// Issue ID
         id: i64,
+
+        /// Expected version for optimistic locking
+        #[arg(long)]
+        expect_version: Option<i64>,
     },
 
     /// Close an issue
@@ -119,12 +131,20 @@ pub enum IssueCommands {
         /// Resolution (resolved, wontfix)
         #[arg(long, default_value = "resolved")]
         resolution: String,
+
+        /// Expected version for optimistic locking
+        #[arg(long)]
+        expect_version: Option<i64>,
     },
 
     /// Reopen a closed issue
     Reopen {
         /// Issue ID
         id: i64,
+
+        /// Expected version for optimistic locking
+        #[arg(long)]
+        expect_version: Option<i64>,
     },
 
     /// Create a dependency link

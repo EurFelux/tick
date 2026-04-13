@@ -83,6 +83,7 @@ impl Database {
         issues::get_summary(&self.conn, id)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn update_issue_fields(
         &self,
         id: i64,
@@ -91,6 +92,7 @@ impl Database {
         issue_type: Option<&IssueType>,
         priority: Option<&Priority>,
         parent_id: Option<Option<i64>>,
+        expect_version: Option<i64>,
     ) -> Result<Issue> {
         issues::update_fields(
             &self.conn,
@@ -100,6 +102,7 @@ impl Database {
             issue_type,
             priority,
             parent_id,
+            expect_version,
         )
     }
 
@@ -113,6 +116,7 @@ impl Database {
         branch: Option<Option<&str>>,
         clear_branch: bool,
         clear_resolution: bool,
+        expect_version: Option<i64>,
     ) -> Result<Issue> {
         issues::update_status_atomic(
             &self.conn,
@@ -123,6 +127,7 @@ impl Database {
             branch,
             clear_branch,
             clear_resolution,
+            expect_version,
         )
     }
 

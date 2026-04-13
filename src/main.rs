@@ -166,6 +166,7 @@ fn run(cli: Cli) -> Result<()> {
                     issue_type,
                     priority,
                     parent,
+                    expect_version,
                 } => {
                     let issue = cmd_issue::update(
                         &db,
@@ -175,6 +176,7 @@ fn run(cli: Cli) -> Result<()> {
                         issue_type.as_deref(),
                         priority.as_deref(),
                         parent,
+                        expect_version,
                     )?;
                     if pretty_mode {
                         pretty::print_issue(&issue);
@@ -183,8 +185,8 @@ fn run(cli: Cli) -> Result<()> {
                     }
                 }
 
-                IssueCommands::Start { id, branch } => {
-                    let issue = cmd_issue::start(&db, id, &branch)?;
+                IssueCommands::Start { id, branch, expect_version } => {
+                    let issue = cmd_issue::start(&db, id, &branch, expect_version)?;
                     if pretty_mode {
                         pretty::print_issue(&issue);
                     } else {
@@ -192,8 +194,8 @@ fn run(cli: Cli) -> Result<()> {
                     }
                 }
 
-                IssueCommands::Done { id } => {
-                    let issue = cmd_issue::done(&db, id)?;
+                IssueCommands::Done { id, expect_version } => {
+                    let issue = cmd_issue::done(&db, id, expect_version)?;
                     if pretty_mode {
                         pretty::print_issue(&issue);
                     } else {
@@ -206,8 +208,9 @@ fn run(cli: Cli) -> Result<()> {
                     comment,
                     role,
                     resolution,
+                    expect_version,
                 } => {
-                    let issue = cmd_issue::close(&db, id, comment.as_deref(), &role, &resolution)?;
+                    let issue = cmd_issue::close(&db, id, comment.as_deref(), &role, &resolution, expect_version)?;
                     if pretty_mode {
                         pretty::print_issue(&issue);
                     } else {
@@ -215,8 +218,8 @@ fn run(cli: Cli) -> Result<()> {
                     }
                 }
 
-                IssueCommands::Reopen { id } => {
-                    let issue = cmd_issue::reopen(&db, id)?;
+                IssueCommands::Reopen { id, expect_version } => {
+                    let issue = cmd_issue::reopen(&db, id, expect_version)?;
                     if pretty_mode {
                         pretty::print_issue(&issue);
                     } else {
