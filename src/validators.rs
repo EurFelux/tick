@@ -20,6 +20,14 @@ pub fn validate_start(db: &Database, issue_id: i64, branch: &str) -> Result<()> 
                 dep.id, dep.title
             )));
         }
+        // Closed with wontfix does not count as resolved
+        let full = db.get_issue(dep.id)?;
+        if full.resolution != Some(Resolution::Resolved) {
+            return Err(TickError::InvalidArgument(format!(
+                "cannot start: dependency issue {} ('{}') is closed but not resolved",
+                dep.id, dep.title
+            )));
+        }
     }
 
     Ok(())
@@ -42,9 +50,7 @@ pub fn validate_close_resolution(status: &IssueStatus, resolution: &Resolution) 
             // Both resolved and wontfix are allowed
         }
         IssueStatus::Closed => {
-            return Err(TickError::Conflict(
-                "issue is already closed".to_string(),
-            ));
+            return Err(TickError::Conflict("issue is already closed".to_string()));
         }
     }
     Ok(())
@@ -52,11 +58,7 @@ pub fn validate_close_resolution(status: &IssueStatus, resolution: &Resolution) 
 
 /// Validate that setting `new_parent_id` as parent of `issue_id` does not create a cycle.
 /// Walks the ancestor chain from `new_parent_id` upward; if `issue_id` is found, it's a cycle.
-pub fn validate_parent_no_cycle(
-    db: &Database,
-    issue_id: i64,
-    new_parent_id: i64,
-) -> Result<()> {
+pub fn validate_parent_no_cycle(db: &Database, issue_id: i64, new_parent_id: i64) -> Result<()> {
     if issue_id == new_parent_id {
         return Err(TickError::InvalidArgument(format!(
             "issue {} cannot be its own parent",
@@ -102,7 +104,13 @@ mod tests {
     fn test_validate_start_empty_branch() {
         let (db, _file) = make_db();
         let id = db
-            .create_issue("test", "", &crate::models::IssueType::Feature, &crate::models::Priority::Medium, None)
+            .create_issue(
+                "test",
+                "",
+                &crate::models::IssueType::Feature,
+                &crate::models::Priority::Medium,
+                None,
+            )
             .unwrap();
         let result = validate_start(&db, id, "");
         assert!(result.is_err());
@@ -134,7 +142,13 @@ mod tests {
     fn test_validate_parent_self_reference() {
         let (db, _file) = make_db();
         let id = db
-            .create_issue("self", "", &crate::models::IssueType::Feature, &crate::models::Priority::Medium, None)
+            .create_issue(
+                "self",
+                "",
+                &crate::models::IssueType::Feature,
+                &crate::models::Priority::Medium,
+                None,
+            )
             .unwrap();
         let result = validate_parent_no_cycle(&db, id, id);
         assert!(result.is_err());
@@ -147,10 +161,22 @@ mod tests {
         // Create A and B, set B.parent = A, then try to set A.parent = B (should fail)
         let (db, _file) = make_db();
         let a = db
-            .create_issue("A", "", &crate::models::IssueType::Feature, &crate::models::Priority::Medium, None)
+            .create_issue(
+                "A",
+                "",
+                &crate::models::IssueType::Feature,
+                &crate::models::Priority::Medium,
+                None,
+            )
             .unwrap();
         let b = db
-            .create_issue("B", "", &crate::models::IssueType::Feature, &crate::models::Priority::Medium, Some(a))
+            .create_issue(
+                "B",
+                "",
+                &crate::models::IssueType::Feature,
+                &crate::models::Priority::Medium,
+                Some(a),
+            )
             .unwrap();
         // Now try to set A's parent to B — should detect cycle
         let result = validate_parent_no_cycle(&db, a, b);

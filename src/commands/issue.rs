@@ -164,11 +164,7 @@ pub fn close(
     let issue = db.get_issue(id)?;
     validators::validate_close_resolution(&issue.status, &res)?;
 
-    if let Some(body) = comment {
-        db.create_comment(id, body, &crole)?;
-    }
-
-    db.update_issue_status_atomic(
+    let updated = db.update_issue_status_atomic(
         id,
         &issue.status,
         &IssueStatus::Closed,
@@ -176,7 +172,13 @@ pub fn close(
         None,
         false,
         false,
-    )
+    )?;
+
+    if let Some(body) = comment {
+        db.create_comment(id, body, &crole)?;
+    }
+
+    Ok(updated)
 }
 
 pub fn reopen(db: &Database, id: i64) -> Result<Issue> {

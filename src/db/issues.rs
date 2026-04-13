@@ -344,7 +344,13 @@ pub fn count_by_status(conn: &Connection) -> Result<std::collections::HashMap<St
         Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
     })?;
 
+    // Initialize all four statuses at 0 so zero-count statuses are always present
     let mut map = std::collections::HashMap::new();
+    map.insert("open".to_string(), 0i64);
+    map.insert("in-progress".to_string(), 0i64);
+    map.insert("done".to_string(), 0i64);
+    map.insert("closed".to_string(), 0i64);
+
     for row in rows {
         let (status, count) = row?;
         map.insert(status, count);

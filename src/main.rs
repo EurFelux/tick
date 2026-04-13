@@ -1,20 +1,30 @@
 use clap::Parser;
 use serde_json::json;
 
-use tick::cli::{Cli, Commands};
 use tick::cli::issue::IssueCommands;
+use tick::cli::{Cli, Commands};
 use tick::commands::{init, issue as cmd_issue};
+use tick::db::migrate;
 use tick::error::Result;
 use tick::output::{json as out_json, pretty};
-use tick::db::migrate;
 
 fn main() {
+    // Try to parse CLI args first so we can respect --pretty in error output
+    let pretty_mode = match Cli::try_parse() {
+        Ok(cli) => cli.pretty,
+        Err(_) => false, // CLI parse failure: fall back to JSON errors
+    };
+
     if let Err(e) = run() {
-        let err_json = json!({
-            "error": e.to_string(),
-            "code": e.error_code(),
-        });
-        eprintln!("{}", err_json);
+        if pretty_mode {
+            eprintln!("error: {} (code: {})", e, e.error_code());
+        } else {
+            let err_json = json!({
+                "error": e.to_string(),
+                "code": e.error_code(),
+            });
+            eprintln!("{}", err_json);
+        }
         std::process::exit(e.exit_code());
     }
 }
@@ -170,13 +180,7 @@ fn run() -> Result<()> {
                     role,
                     resolution,
                 } => {
-                    let issue = cmd_issue::close(
-                        &db,
-                        id,
-                        comment.as_deref(),
-                        &role,
-                        &resolution,
-                    )?;
+                    let issue = cmd_issue::close(&db, id, comment.as_deref(), &role, &resolution)?;
                     if pretty_mode {
                         pretty::print_issue(&issue);
                     } else {
