@@ -293,6 +293,22 @@ fn run(cli: Cli) -> Result<()> {
                     }
                 }
 
+                IssueCommands::Search { query, limit, offset } => {
+                    let issues = cmd_issue::search(&db, &query, limit, offset)?;
+                    if quiet {
+                        for issue in &issues {
+                            println!("{}", issue.id);
+                        }
+                    } else if let Some(ref field_list) = fields {
+                        let refs: Vec<&str> = field_list.iter().map(|s| s.as_str()).collect();
+                        out_json::print_filtered(&issues, &refs);
+                    } else if pretty_mode {
+                        pretty::print_issue_list(&issues);
+                    } else {
+                        out_json::print(&issues);
+                    }
+                }
+
                 IssueCommands::Link {
                     from_id,
                     relation,

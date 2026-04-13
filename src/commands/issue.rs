@@ -192,6 +192,10 @@ pub fn close(
     Ok(updated)
 }
 
+pub fn search(db: &Database, query: &str, limit: i64, offset: i64) -> Result<Vec<Issue>> {
+    db.search_issues(query, limit, offset)
+}
+
 pub fn link(db: &Database, from_id: i64, relation: &str, to_id: i64) -> Result<serde_json::Value> {
     if relation != "depends-on" {
         return Err(TickError::InvalidArgument(format!(

@@ -135,6 +135,10 @@ impl Database {
         issues::count_by_status(&self.conn)
     }
 
+    pub fn search_issues(&self, query: &str, limit: i64, offset: i64) -> Result<Vec<Issue>> {
+        issues::search(&self.conn, query, limit, offset)
+    }
+
     // Comment methods
 
     pub fn create_comment(&self, issue_id: i64, body: &str, role: &CommentRole) -> Result<i64> {

@@ -1,4 +1,4 @@
-use rusqlite::{Connection, Row};
+use rusqlite::{params, Connection, Row};
 
 use crate::error::{Result, TickError};
 use crate::models::{Issue, IssueStatus, IssueSummary, IssueType, Priority, Resolution};
@@ -379,6 +379,21 @@ pub fn update_status_atomic(
     } else {
         get(conn, id)
     }
+}
+
+pub fn search(conn: &Connection, query: &str, limit: i64, offset: i64) -> Result<Vec<Issue>> {
+    let mut stmt = conn.prepare(
+        "SELECT i.id, i.parent_id, i.title, i.description, i.type, i.status, i.priority, i.resolution, i.branch, i.version, i.created_at, i.updated_at
+         FROM issues i
+         JOIN issues_fts fts ON i.id = fts.rowid
+         WHERE issues_fts MATCH ?1
+         ORDER BY rank
+         LIMIT ?2 OFFSET ?3",
+    )?;
+    let issues = stmt
+        .query_map(params![query, limit, offset], row_to_issue)?
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    Ok(issues)
 }
 
 pub fn count_by_status(conn: &Connection) -> Result<std::collections::HashMap<String, i64>> {

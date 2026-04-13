@@ -147,6 +147,20 @@ pub enum IssueCommands {
         expect_version: Option<i64>,
     },
 
+    /// Full-text search issues
+    Search {
+        /// Search query
+        query: String,
+
+        /// Max results
+        #[arg(long, default_value_t = 50)]
+        limit: i64,
+
+        /// Results offset
+        #[arg(long, default_value_t = 0)]
+        offset: i64,
+    },
+
     /// Create a dependency link
     Link {
         from_id: i64,

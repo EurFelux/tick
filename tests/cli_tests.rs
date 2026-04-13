@@ -1064,3 +1064,48 @@ fn test_dry_run_start() {
         .success()
         .stdout(predicate::str::contains("\"status\":\"open\""));
 }
+
+#[test]
+fn test_search() {
+    let (_dir, db_path) = setup();
+
+    tick()
+        .args(["--db", &db_path, "issue", "create", "Alpha feature request", "--type", "feature"])
+        .assert()
+        .success();
+
+    tick()
+        .args(["--db", &db_path, "issue", "create", "Beta bug report", "--type", "bug"])
+        .assert()
+        .success();
+
+    // Search for "Alpha" — should only match first issue
+    let output = tick()
+        .args(["--db", &db_path, "issue", "search", "Alpha"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stdout = String::from_utf8_lossy(&output);
+    assert!(stdout.contains("Alpha feature request"), "search should match 'Alpha feature request'");
+    assert!(!stdout.contains("Beta bug report"), "search should NOT match 'Beta bug report'");
+}
+
+#[test]
+fn test_search_no_results() {
+    let (_dir, db_path) = setup();
+
+    tick()
+        .args(["--db", &db_path, "issue", "create", "Some issue", "--type", "bug"])
+        .assert()
+        .success();
+
+    // Search for nonexistent term
+    tick()
+        .args(["--db", &db_path, "issue", "search", "xyznonexistent123"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("[]"));
+}
