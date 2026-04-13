@@ -1,3 +1,16 @@
+mod error;
+
 fn main() {
-    println!("tick v0.1.0");
+    if let Err(e) = run() {
+        let json = serde_json::json!({
+            "error": e.to_string(),
+            "code": e.error_code(),
+        });
+        eprintln!("{}", json);
+        std::process::exit(e.exit_code());
+    }
+}
+
+fn run() -> error::Result<()> {
+    Ok(())
 }
