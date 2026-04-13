@@ -256,8 +256,14 @@ pub fn batch_create(db: &Database) -> Result<(Vec<serde_json::Value>, bool)> {
                     continue;
                 }
                 let desc = obj.get("description").and_then(|v| v.as_str());
-                let itype = obj.get("type").and_then(|v| v.as_str()).unwrap_or("feature");
-                let prio = obj.get("priority").and_then(|v| v.as_str()).unwrap_or("medium");
+                let itype = obj
+                    .get("type")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("feature");
+                let prio = obj
+                    .get("priority")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("medium");
                 let parent = obj.get("parent").and_then(|v| v.as_i64());
 
                 match create(db, title, desc, itype, prio, parent) {

@@ -632,7 +632,13 @@ fn test_comment_add_and_list() {
     // Create an issue to comment on
     tick()
         .args([
-            "--db", &db_path, "issue", "create", "Comment test issue", "--type", "bug",
+            "--db",
+            &db_path,
+            "issue",
+            "create",
+            "Comment test issue",
+            "--type",
+            "bug",
         ])
         .assert()
         .success();
@@ -640,7 +646,14 @@ fn test_comment_add_and_list() {
     // Add a comment with role worker
     tick()
         .args([
-            "--db", &db_path, "comment", "add", "1", "First comment", "--role", "worker",
+            "--db",
+            &db_path,
+            "comment",
+            "add",
+            "1",
+            "First comment",
+            "--role",
+            "worker",
         ])
         .assert()
         .success()
@@ -667,7 +680,10 @@ fn test_comment_add_and_list() {
         .clone();
 
     let stdout = String::from_utf8_lossy(&output);
-    assert!(stdout.contains("First comment"), "should contain first comment");
+    assert!(
+        stdout.contains("First comment"),
+        "should contain first comment"
+    );
     assert!(stdout.contains("LGTM"), "should contain second comment");
 
     // Filter by role worker — should only have first comment
@@ -680,12 +696,20 @@ fn test_comment_add_and_list() {
         .clone();
 
     let filtered = String::from_utf8_lossy(&output);
-    assert!(filtered.contains("First comment"), "should contain worker comment");
-    assert!(!filtered.contains("LGTM"), "should NOT contain reviewer comment");
+    assert!(
+        filtered.contains("First comment"),
+        "should contain worker comment"
+    );
+    assert!(
+        !filtered.contains("LGTM"),
+        "should NOT contain reviewer comment"
+    );
 
     // Filter by role reviewer — should only have LGTM
     let output = tick()
-        .args(["--db", &db_path, "comment", "list", "1", "--role", "reviewer"])
+        .args([
+            "--db", &db_path, "comment", "list", "1", "--role", "reviewer",
+        ])
         .assert()
         .success()
         .get_output()
@@ -693,8 +717,14 @@ fn test_comment_add_and_list() {
         .clone();
 
     let reviewer_filtered = String::from_utf8_lossy(&output);
-    assert!(reviewer_filtered.contains("LGTM"), "should contain reviewer comment");
-    assert!(!reviewer_filtered.contains("First comment"), "should NOT contain worker comment");
+    assert!(
+        reviewer_filtered.contains("LGTM"),
+        "should contain reviewer comment"
+    );
+    assert!(
+        !reviewer_filtered.contains("First comment"),
+        "should NOT contain worker comment"
+    );
 }
 
 #[test]
@@ -703,7 +733,14 @@ fn test_comment_add_nonexistent_issue() {
 
     // Attempt to add a comment to a non-existent issue
     tick()
-        .args(["--db", &db_path, "comment", "add", "999", "This should fail"])
+        .args([
+            "--db",
+            &db_path,
+            "comment",
+            "add",
+            "999",
+            "This should fail",
+        ])
         .assert()
         .failure()
         .code(2)
@@ -716,11 +753,27 @@ fn test_link_and_show() {
 
     // Create two issues
     tick()
-        .args(["--db", &db_path, "issue", "create", "Base feature", "--type", "feature"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "create",
+            "Base feature",
+            "--type",
+            "feature",
+        ])
         .assert()
         .success();
     tick()
-        .args(["--db", &db_path, "issue", "create", "Dependent task", "--type", "bug"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "create",
+            "Dependent task",
+            "--type",
+            "bug",
+        ])
         .assert()
         .success();
 
@@ -747,7 +800,15 @@ fn test_link_self_reference_rejected() {
     let (_dir, db_path) = setup();
 
     tick()
-        .args(["--db", &db_path, "issue", "create", "Self ref test", "--type", "bug"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "create",
+            "Self ref test",
+            "--type",
+            "bug",
+        ])
         .assert()
         .success();
 
@@ -765,11 +826,15 @@ fn test_link_cycle_rejected() {
     let (_dir, db_path) = setup();
 
     tick()
-        .args(["--db", &db_path, "issue", "create", "Issue A", "--type", "feature"])
+        .args([
+            "--db", &db_path, "issue", "create", "Issue A", "--type", "feature",
+        ])
         .assert()
         .success();
     tick()
-        .args(["--db", &db_path, "issue", "create", "Issue B", "--type", "feature"])
+        .args([
+            "--db", &db_path, "issue", "create", "Issue B", "--type", "feature",
+        ])
         .assert()
         .success();
 
@@ -793,11 +858,15 @@ fn test_unlink() {
     let (_dir, db_path) = setup();
 
     tick()
-        .args(["--db", &db_path, "issue", "create", "Issue X", "--type", "feature"])
+        .args([
+            "--db", &db_path, "issue", "create", "Issue X", "--type", "feature",
+        ])
         .assert()
         .success();
     tick()
-        .args(["--db", &db_path, "issue", "create", "Issue Y", "--type", "feature"])
+        .args([
+            "--db", &db_path, "issue", "create", "Issue Y", "--type", "feature",
+        ])
         .assert()
         .success();
 
@@ -837,11 +906,27 @@ fn test_start_blocked_by_unresolved_dependency() {
 
     // Create dependency (open) and dependent
     tick()
-        .args(["--db", &db_path, "issue", "create", "Blocker issue", "--type", "feature"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "create",
+            "Blocker issue",
+            "--type",
+            "feature",
+        ])
         .assert()
         .success();
     tick()
-        .args(["--db", &db_path, "issue", "create", "Blocked issue", "--type", "bug"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "create",
+            "Blocked issue",
+            "--type",
+            "bug",
+        ])
         .assert()
         .success();
 
@@ -853,7 +938,15 @@ fn test_start_blocked_by_unresolved_dependency() {
 
     // Try to start issue 2 — should fail because issue 1 is not closed
     tick()
-        .args(["--db", &db_path, "issue", "start", "2", "--branch", "fix/blocked"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "start",
+            "2",
+            "--branch",
+            "fix/blocked",
+        ])
         .assert()
         .failure()
         .code(3)
@@ -866,15 +959,39 @@ fn test_cascade_wontfix() {
 
     // Create base issue and two dependents
     tick()
-        .args(["--db", &db_path, "issue", "create", "Base issue", "--type", "feature"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "create",
+            "Base issue",
+            "--type",
+            "feature",
+        ])
         .assert()
         .success();
     tick()
-        .args(["--db", &db_path, "issue", "create", "Dependent A", "--type", "bug"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "create",
+            "Dependent A",
+            "--type",
+            "bug",
+        ])
         .assert()
         .success();
     tick()
-        .args(["--db", &db_path, "issue", "create", "Dependent B", "--type", "bug"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "create",
+            "Dependent B",
+            "--type",
+            "bug",
+        ])
         .assert()
         .success();
 
@@ -890,7 +1007,15 @@ fn test_cascade_wontfix() {
 
     // Wontfix the base issue
     tick()
-        .args(["--db", &db_path, "issue", "close", "1", "--resolution", "wontfix"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "close",
+            "1",
+            "--resolution",
+            "wontfix",
+        ])
         .assert()
         .success()
         .stdout(predicate::str::contains("\"status\":\"closed\""))
@@ -916,13 +1041,17 @@ fn test_cascade_wontfix() {
         .args(["--db", &db_path, "comment", "list", "2"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Closed by cascade: dependency #1 was abandoned"));
+        .stdout(predicate::str::contains(
+            "Closed by cascade: dependency #1 was abandoned",
+        ));
 
     tick()
         .args(["--db", &db_path, "comment", "list", "3"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Closed by cascade: dependency #1 was abandoned"));
+        .stdout(predicate::str::contains(
+            "Closed by cascade: dependency #1 was abandoned",
+        ));
 }
 
 #[test]
@@ -931,7 +1060,13 @@ fn test_expect_version_correct() {
 
     tick()
         .args([
-            "--db", &db_path, "issue", "create", "Version test", "--type", "bug",
+            "--db",
+            &db_path,
+            "issue",
+            "create",
+            "Version test",
+            "--type",
+            "bug",
         ])
         .assert()
         .success();
@@ -939,8 +1074,15 @@ fn test_expect_version_correct() {
     // version after create is 1
     tick()
         .args([
-            "--db", &db_path, "issue", "update", "1", "--title", "Updated title",
-            "--expect-version", "1",
+            "--db",
+            &db_path,
+            "issue",
+            "update",
+            "1",
+            "--title",
+            "Updated title",
+            "--expect-version",
+            "1",
         ])
         .assert()
         .success()
@@ -953,7 +1095,13 @@ fn test_expect_version_wrong() {
 
     tick()
         .args([
-            "--db", &db_path, "issue", "create", "Version conflict test", "--type", "bug",
+            "--db",
+            &db_path,
+            "issue",
+            "create",
+            "Version conflict test",
+            "--type",
+            "bug",
         ])
         .assert()
         .success();
@@ -961,8 +1109,15 @@ fn test_expect_version_wrong() {
     // version is 1, but we pass 999 — should fail with CONFLICT (exit 6)
     tick()
         .args([
-            "--db", &db_path, "issue", "update", "1", "--title", "Should fail",
-            "--expect-version", "999",
+            "--db",
+            &db_path,
+            "issue",
+            "update",
+            "1",
+            "--title",
+            "Should fail",
+            "--expect-version",
+            "999",
         ])
         .assert()
         .failure()
@@ -976,7 +1131,13 @@ fn test_expect_version_not_provided() {
 
     tick()
         .args([
-            "--db", &db_path, "issue", "create", "No version flag test", "--type", "bug",
+            "--db",
+            &db_path,
+            "issue",
+            "create",
+            "No version flag test",
+            "--type",
+            "bug",
         ])
         .assert()
         .success();
@@ -984,7 +1145,13 @@ fn test_expect_version_not_provided() {
     // No --expect-version flag — should succeed normally
     tick()
         .args([
-            "--db", &db_path, "issue", "update", "1", "--title", "New title",
+            "--db",
+            &db_path,
+            "issue",
+            "update",
+            "1",
+            "--title",
+            "New title",
         ])
         .assert()
         .success()
@@ -997,7 +1164,13 @@ fn test_fields_filter() {
 
     tick()
         .args([
-            "--db", &db_path, "issue", "create", "Fields test", "--type", "bug",
+            "--db",
+            &db_path,
+            "issue",
+            "create",
+            "Fields test",
+            "--type",
+            "bug",
         ])
         .assert()
         .success();
@@ -1015,7 +1188,10 @@ fn test_fields_filter() {
     let stdout = String::from_utf8_lossy(&output);
     assert!(stdout.contains("\"id\""), "output should contain id");
     assert!(stdout.contains("\"title\""), "output should contain title");
-    assert!(!stdout.contains("\"status\""), "output should NOT contain status");
+    assert!(
+        !stdout.contains("\"status\""),
+        "output should NOT contain status"
+    );
 }
 
 #[test]
@@ -1024,7 +1200,14 @@ fn test_quiet_mode() {
 
     let output = tick()
         .args([
-            "--db", &db_path, "--quiet", "issue", "create", "Quiet test", "--type", "bug",
+            "--db",
+            &db_path,
+            "--quiet",
+            "issue",
+            "create",
+            "Quiet test",
+            "--type",
+            "bug",
         ])
         .assert()
         .success()
@@ -1042,7 +1225,13 @@ fn test_dry_run_start() {
 
     tick()
         .args([
-            "--db", &db_path, "issue", "create", "Dry run test", "--type", "bug",
+            "--db",
+            &db_path,
+            "issue",
+            "create",
+            "Dry run test",
+            "--type",
+            "bug",
         ])
         .assert()
         .success();
@@ -1050,7 +1239,14 @@ fn test_dry_run_start() {
     // dry-run start — should succeed and output dry_run info, NOT change status
     tick()
         .args([
-            "--db", &db_path, "--dry-run", "issue", "start", "1", "--branch", "fix/dry",
+            "--db",
+            &db_path,
+            "--dry-run",
+            "issue",
+            "start",
+            "1",
+            "--branch",
+            "fix/dry",
         ])
         .assert()
         .success()
@@ -1070,12 +1266,28 @@ fn test_search() {
     let (_dir, db_path) = setup();
 
     tick()
-        .args(["--db", &db_path, "issue", "create", "Alpha feature request", "--type", "feature"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "create",
+            "Alpha feature request",
+            "--type",
+            "feature",
+        ])
         .assert()
         .success();
 
     tick()
-        .args(["--db", &db_path, "issue", "create", "Beta bug report", "--type", "bug"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "create",
+            "Beta bug report",
+            "--type",
+            "bug",
+        ])
         .assert()
         .success();
 
@@ -1089,8 +1301,14 @@ fn test_search() {
         .clone();
 
     let stdout = String::from_utf8_lossy(&output);
-    assert!(stdout.contains("Alpha feature request"), "search should match 'Alpha feature request'");
-    assert!(!stdout.contains("Beta bug report"), "search should NOT match 'Beta bug report'");
+    assert!(
+        stdout.contains("Alpha feature request"),
+        "search should match 'Alpha feature request'"
+    );
+    assert!(
+        !stdout.contains("Beta bug report"),
+        "search should NOT match 'Beta bug report'"
+    );
 }
 
 #[test]
@@ -1098,7 +1316,15 @@ fn test_search_no_results() {
     let (_dir, db_path) = setup();
 
     tick()
-        .args(["--db", &db_path, "issue", "create", "Some issue", "--type", "bug"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "create",
+            "Some issue",
+            "--type",
+            "bug",
+        ])
         .assert()
         .success();
 

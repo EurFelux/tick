@@ -12,7 +12,10 @@ pub fn print<T: Serialize>(value: &T) {
 pub fn print_filtered<T: Serialize>(value: &T, fields: &[&str]) {
     let v = serde_json::to_value(value).expect("serialization failed");
     let filtered = filter_value(v, fields);
-    println!("{}", serde_json::to_string(&filtered).expect("serialization failed"));
+    println!(
+        "{}",
+        serde_json::to_string(&filtered).expect("serialization failed")
+    );
 }
 
 fn filter_value(v: serde_json::Value, fields: &[&str]) -> serde_json::Value {
@@ -25,8 +28,10 @@ fn filter_value(v: serde_json::Value, fields: &[&str]) -> serde_json::Value {
             serde_json::Value::Object(filtered)
         }
         serde_json::Value::Array(arr) => {
-            let filtered: Vec<serde_json::Value> =
-                arr.into_iter().map(|item| filter_value(item, fields)).collect();
+            let filtered: Vec<serde_json::Value> = arr
+                .into_iter()
+                .map(|item| filter_value(item, fields))
+                .collect();
             serde_json::Value::Array(filtered)
         }
         other => other,

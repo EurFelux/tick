@@ -32,12 +32,7 @@ fn main() {
     }
 }
 
-fn print_issue_output(
-    issue: &Issue,
-    pretty_mode: bool,
-    quiet: bool,
-    fields: &Option<Vec<String>>,
-) {
+fn print_issue_output(issue: &Issue, pretty_mode: bool, quiet: bool, fields: &Option<Vec<String>>) {
     if quiet {
         println!("{}", issue.id);
     } else if let Some(ref field_list) = fields {
@@ -142,12 +137,7 @@ fn run(cli: Cli) -> Result<()> {
 
         Commands::Config(args) => {
             let db = init::open_db(db_path)?;
-            let result = cmd_config::run(
-                &db,
-                args.set.as_deref(),
-                args.get.as_deref(),
-                args.list,
-            )?;
+            let result = cmd_config::run(&db, args.set.as_deref(), args.get.as_deref(), args.list)?;
             if pretty_mode {
                 pretty::print_config(&result);
             } else {
@@ -251,7 +241,11 @@ fn run(cli: Cli) -> Result<()> {
                     }
                 }
 
-                IssueCommands::Start { id, branch, expect_version } => {
+                IssueCommands::Start {
+                    id,
+                    branch,
+                    expect_version,
+                } => {
                     if dry_run {
                         tick::validators::validate_start(&db, id, &branch)?;
                         out_json::print(&json!({"dry_run": true, "would_succeed": true}));
@@ -308,7 +302,11 @@ fn run(cli: Cli) -> Result<()> {
                     }
                 }
 
-                IssueCommands::Search { query, limit, offset } => {
+                IssueCommands::Search {
+                    query,
+                    limit,
+                    offset,
+                } => {
                     let issues = cmd_issue::search(&db, &query, limit, offset)?;
                     if quiet {
                         for issue in &issues {

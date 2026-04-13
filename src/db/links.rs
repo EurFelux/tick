@@ -25,16 +25,19 @@ pub fn delete(conn: &Connection, from_id: i64, to_id: i64) -> Result<()> {
         params![to_id, from_id],
     )?;
     if deleted == 0 {
-        return Err(TickError::NotFound(format!("link from #{from_id} to #{to_id} not found")));
+        return Err(TickError::NotFound(format!(
+            "link from #{from_id} to #{to_id} not found"
+        )));
     }
     Ok(())
 }
 
 pub fn get_depended_by_ids(conn: &Connection, issue_id: i64) -> Result<Vec<i64>> {
     let mut stmt = conn.prepare(
-        "SELECT from_issue_id FROM issue_links WHERE to_issue_id = ?1 AND relation = 'depends-on'"
+        "SELECT from_issue_id FROM issue_links WHERE to_issue_id = ?1 AND relation = 'depends-on'",
     )?;
-    let ids = stmt.query_map([issue_id], |row| row.get(0))?
+    let ids = stmt
+        .query_map([issue_id], |row| row.get(0))?
         .collect::<std::result::Result<Vec<i64>, _>>()?;
     Ok(ids)
 }

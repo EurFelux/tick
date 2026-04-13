@@ -170,10 +170,7 @@ pub enum IssueCommands {
     },
 
     /// Remove a dependency link
-    Unlink {
-        from_id: i64,
-        to_id: i64,
-    },
+    Unlink { from_id: i64, to_id: i64 },
 
     /// Batch create issues from stdin JSONL
     BatchCreate,

@@ -24,7 +24,8 @@ fn row_to_issue(row: &Row) -> rusqlite::Result<Issue> {
     let status: IssueStatus = status_str.parse().expect("invalid status in DB");
     let issue_type: IssueType = type_str.parse().expect("invalid type in DB");
     let priority: Priority = priority_str.parse().expect("invalid priority in DB");
-    let resolution: Option<Resolution> = resolution_str.map(|s| s.parse().expect("invalid resolution in DB"));
+    let resolution: Option<Resolution> =
+        resolution_str.map(|s| s.parse().expect("invalid resolution in DB"));
 
     Ok(Issue {
         id: row.get(0)?,
