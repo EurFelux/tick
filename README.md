@@ -150,6 +150,16 @@ Comments carry a `role` indicating the perspective, not the identity:
 | `user` | Human input (default) |
 | `system` | Auto-generated (e.g., cascade close) |
 
+## Agent Skill
+
+tick ships with a Claude Code skill at `.claude/skills/tick-agent/`. When the skill is loaded, agents automatically know how to use all tick commands, follow the state machine, and coordinate with other agents — no `--help` exploration needed.
+
+The skill is picked up automatically when working in a repo that has tick installed. For other repos, copy the skill directory:
+
+```bash
+cp -r .claude/skills/tick-agent /path/to/your-repo/.claude/skills/
+```
+
 ## Storage
 
 - Database: `<git-common-dir>/tick/tick.db`
