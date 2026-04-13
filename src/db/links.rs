@@ -1,0 +1,59 @@
+use rusqlite::Connection;
+
+use crate::error::{Result, TickError};
+use crate::models::{IssueStatus, IssueSummary};
+
+pub fn list_by_issue(
+    conn: &Connection,
+    issue_id: i64,
+) -> Result<(Vec<IssueSummary>, Vec<IssueSummary>)> {
+    // depends_on: issues that this issue depends on (from_issue_id = issue_id, relation = 'depends-on')
+    let depends_on = query_linked_summaries(conn, issue_id, "depends-on", true)?;
+    // depended_by: issues that depend on this issue (to_issue_id = issue_id, relation = 'depends-on')
+    let depended_by = query_linked_summaries(conn, issue_id, "depended-by", false)?;
+
+    Ok((depends_on, depended_by))
+}
+
+fn query_linked_summaries(
+    conn: &Connection,
+    issue_id: i64,
+    relation: &str,
+    from_perspective: bool,
+) -> Result<Vec<IssueSummary>> {
+    let sql = if from_perspective {
+        // from_issue_id = issue_id means this issue depends on to_issue_id
+        "SELECT i.id, i.title, i.status FROM issue_links il \
+         JOIN issues i ON i.id = il.to_issue_id \
+         WHERE il.from_issue_id = ?1 AND il.relation = ?2 \
+         ORDER BY i.id"
+    } else {
+        // to_issue_id = issue_id means from_issue_id depends on this issue
+        "SELECT i.id, i.title, i.status FROM issue_links il \
+         JOIN issues i ON i.id = il.from_issue_id \
+         WHERE il.to_issue_id = ?1 AND il.relation = 'depends-on' \
+         ORDER BY i.id"
+    };
+
+    let mut stmt = conn.prepare(sql)?;
+    let params: &[&dyn rusqlite::types::ToSql] = if from_perspective {
+        &[&issue_id, &relation]
+    } else {
+        &[&issue_id]
+    };
+
+    let rows = stmt.query_map(params, |row| {
+        let status_str: String = row.get(2)?;
+        Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?, status_str))
+    })?;
+
+    let mut summaries = Vec::new();
+    for row in rows {
+        let (id, title, status_str) = row?;
+        let status = status_str
+            .parse::<IssueStatus>()
+            .map_err(TickError::InvalidArgument)?;
+        summaries.push(IssueSummary { id, title, status });
+    }
+    Ok(summaries)
+}

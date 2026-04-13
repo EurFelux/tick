@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__plugin_context7_context7__query-docs",
+      "Skill(codex:rescue)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // .tool_response.filePath' | { read -r f; echo \"$f\" | grep -q '\\.rs$' && cargo fmt -- \"$f\"; } 2>/dev/null || true",
+            "timeout": 30,
+            "statusMessage": "Running cargo fmt..."
+          },
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // .tool_response.filePath' | { read -r f; echo \"$f\" | grep -q '\\.rs$' && cargo clippy --quiet -- -D warnings; } 2>/dev/null || true",
+            "timeout": 60,
+            "statusMessage": "Running cargo clippy..."
+          }
+        ]
+      }
+    ]
+  }
+}
