@@ -322,6 +322,14 @@ fn run(cli: Cli) -> Result<()> {
                     let result = cmd_issue::unlink(&db, from_id, to_id)?;
                     out_json::print(&result);
                 }
+
+                IssueCommands::BatchCreate => {
+                    let (results, has_error) = cmd_issue::batch_create(&db)?;
+                    out_json::print(&results);
+                    if has_error {
+                        std::process::exit(1);
+                    }
+                }
             }
         }
     }

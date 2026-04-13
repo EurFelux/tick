@@ -227,3 +227,52 @@ pub fn reopen(db: &Database, id: i64, expect_version: Option<i64>) -> Result<Iss
         expect_version,
     )
 }
+
+pub fn batch_create(db: &Database) -> Result<(Vec<serde_json::Value>, bool)> {
+    use std::io::BufRead;
+    let stdin = std::io::stdin();
+    let mut results = Vec::new();
+    let mut has_error = false;
+
+    for (i, line) in stdin.lock().lines().enumerate() {
+        let line = match line {
+            Ok(l) => l,
+            Err(e) => {
+                results.push(serde_json::json!({"error": format!("stdin read error: {e}"), "code": "INTERNAL_ERROR", "line": i + 1}));
+                has_error = true;
+                continue;
+            }
+        };
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        match serde_json::from_str::<serde_json::Value>(&line) {
+            Ok(obj) => {
+                let title = obj.get("title").and_then(|v| v.as_str()).unwrap_or("");
+                if title.is_empty() {
+                    results.push(serde_json::json!({"error": "title is required", "code": "INVALID_ARGUMENT", "line": i + 1}));
+                    has_error = true;
+                    continue;
+                }
+                let desc = obj.get("description").and_then(|v| v.as_str());
+                let itype = obj.get("type").and_then(|v| v.as_str()).unwrap_or("feature");
+                let prio = obj.get("priority").and_then(|v| v.as_str()).unwrap_or("medium");
+                let parent = obj.get("parent").and_then(|v| v.as_i64());
+
+                match create(db, title, desc, itype, prio, parent) {
+                    Ok(issue) => results.push(serde_json::to_value(&issue).unwrap()),
+                    Err(e) => {
+                        results.push(serde_json::json!({"error": e.to_string(), "code": e.error_code(), "line": i + 1}));
+                        has_error = true;
+                    }
+                }
+            }
+            Err(e) => {
+                results.push(serde_json::json!({"error": format!("invalid JSON: {e}"), "code": "INVALID_ARGUMENT", "line": i + 1}));
+                has_error = true;
+            }
+        }
+    }
+    Ok((results, has_error))
+}

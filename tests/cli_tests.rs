@@ -1109,3 +1109,35 @@ fn test_search_no_results() {
         .success()
         .stdout(predicate::str::contains("[]"));
 }
+
+#[test]
+fn test_batch_create() {
+    let (_dir, db_path) = setup();
+
+    let jsonl = "{\"title\":\"First batch issue\",\"type\":\"bug\"}\n{\"title\":\"Second batch issue\",\"type\":\"feature\"}\n";
+
+    tick()
+        .args(["--db", &db_path, "issue", "batch-create"])
+        .write_stdin(jsonl)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("First batch issue"))
+        .stdout(predicate::str::contains("Second batch issue"));
+}
+
+#[test]
+fn test_batch_create_partial_failure() {
+    let (_dir, db_path) = setup();
+
+    let jsonl = "{\"title\":\"Good issue one\",\"type\":\"bug\"}\n{\"notitle\":\"bad line\"}\n{\"title\":\"Good issue two\",\"type\":\"feature\"}\n";
+
+    tick()
+        .args(["--db", &db_path, "issue", "batch-create"])
+        .write_stdin(jsonl)
+        .assert()
+        .failure()
+        .code(1)
+        .stdout(predicate::str::contains("Good issue one"))
+        .stdout(predicate::str::contains("Good issue two"))
+        .stdout(predicate::str::contains("title is required"));
+}

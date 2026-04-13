@@ -174,4 +174,7 @@ pub enum IssueCommands {
         from_id: i64,
         to_id: i64,
     },
+
+    /// Batch create issues from stdin JSONL
+    BatchCreate,
 }
