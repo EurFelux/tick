@@ -9,10 +9,7 @@ fn tick() -> Command {
 fn setup() -> (TempDir, String) {
     let dir = TempDir::new().unwrap();
     let db_path = dir.path().join("test.db").to_str().unwrap().to_string();
-    tick()
-        .args(["--db", &db_path, "init"])
-        .assert()
-        .success();
+    tick().args(["--db", &db_path, "init"]).assert().success();
     (dir, db_path)
 }
 
@@ -45,7 +42,15 @@ fn test_create_issue() {
     let (_dir, db_path) = setup();
 
     tick()
-        .args(["--db", &db_path, "issue", "create", "Fix the thing", "--type", "bug"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "create",
+            "Fix the thing",
+            "--type",
+            "bug",
+        ])
         .assert()
         .success()
         .stdout(predicate::str::contains("\"id\":1"))
@@ -58,12 +63,22 @@ fn test_list_issues() {
     let (_dir, db_path) = setup();
 
     tick()
-        .args(["--db", &db_path, "issue", "create", "Bug one", "--type", "bug"])
+        .args([
+            "--db", &db_path, "issue", "create", "Bug one", "--type", "bug",
+        ])
         .assert()
         .success();
 
     tick()
-        .args(["--db", &db_path, "issue", "create", "Feature two", "--type", "feature"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "create",
+            "Feature two",
+            "--type",
+            "feature",
+        ])
         .assert()
         .success();
 
@@ -85,8 +100,14 @@ fn test_list_issues() {
         .clone();
 
     let stdout = String::from_utf8_lossy(&output);
-    assert!(stdout.contains("Bug one"), "list --type bug should contain Bug one");
-    assert!(!stdout.contains("Feature two"), "list --type bug should NOT contain Feature two");
+    assert!(
+        stdout.contains("Bug one"),
+        "list --type bug should contain Bug one"
+    );
+    assert!(
+        !stdout.contains("Feature two"),
+        "list --type bug should NOT contain Feature two"
+    );
 }
 
 #[test]
@@ -94,7 +115,9 @@ fn test_show_issue() {
     let (_dir, db_path) = setup();
 
     tick()
-        .args(["--db", &db_path, "issue", "create", "Show me", "--type", "bug"])
+        .args([
+            "--db", &db_path, "issue", "create", "Show me", "--type", "bug",
+        ])
         .assert()
         .success();
 
@@ -125,14 +148,30 @@ fn test_full_lifecycle() {
 
     // Create
     tick()
-        .args(["--db", &db_path, "issue", "create", "Lifecycle test", "--type", "bug"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "create",
+            "Lifecycle test",
+            "--type",
+            "bug",
+        ])
         .assert()
         .success()
         .stdout(predicate::str::contains("\"status\":\"open\""));
 
     // Start
     tick()
-        .args(["--db", &db_path, "issue", "start", "1", "--branch", "fix/lifecycle"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "start",
+            "1",
+            "--branch",
+            "fix/lifecycle",
+        ])
         .assert()
         .success()
         .stdout(predicate::str::contains("\"status\":\"in-progress\""));
@@ -146,7 +185,15 @@ fn test_full_lifecycle() {
 
     // Close
     tick()
-        .args(["--db", &db_path, "issue", "close", "1", "--resolution", "resolved"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "close",
+            "1",
+            "--resolution",
+            "resolved",
+        ])
         .assert()
         .success()
         .stdout(predicate::str::contains("\"status\":\"closed\""))
@@ -165,19 +212,43 @@ fn test_start_already_in_progress() {
     let (_dir, db_path) = setup();
 
     tick()
-        .args(["--db", &db_path, "issue", "create", "In progress test", "--type", "bug"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "create",
+            "In progress test",
+            "--type",
+            "bug",
+        ])
         .assert()
         .success();
 
     // First start — ok
     tick()
-        .args(["--db", &db_path, "issue", "start", "1", "--branch", "fix/conflict"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "start",
+            "1",
+            "--branch",
+            "fix/conflict",
+        ])
         .assert()
         .success();
 
     // Second start — should fail with exit code 6 (CONFLICT)
     tick()
-        .args(["--db", &db_path, "issue", "start", "1", "--branch", "fix/conflict"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "start",
+            "1",
+            "--branch",
+            "fix/conflict",
+        ])
         .assert()
         .failure()
         .code(6)
@@ -189,12 +260,28 @@ fn test_close_wontfix_from_open() {
     let (_dir, db_path) = setup();
 
     tick()
-        .args(["--db", &db_path, "issue", "create", "Wontfix test", "--type", "bug"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "create",
+            "Wontfix test",
+            "--type",
+            "bug",
+        ])
         .assert()
         .success();
 
     tick()
-        .args(["--db", &db_path, "issue", "close", "1", "--resolution", "wontfix"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "close",
+            "1",
+            "--resolution",
+            "wontfix",
+        ])
         .assert()
         .success()
         .stdout(predicate::str::contains("\"status\":\"closed\""))
@@ -206,13 +293,29 @@ fn test_close_resolved_from_open_rejected() {
     let (_dir, db_path) = setup();
 
     tick()
-        .args(["--db", &db_path, "issue", "create", "Rejected close test", "--type", "bug"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "create",
+            "Rejected close test",
+            "--type",
+            "bug",
+        ])
         .assert()
         .success();
 
     // Closing an open issue with "resolved" should be rejected (exit code 3)
     tick()
-        .args(["--db", &db_path, "issue", "close", "1", "--resolution", "resolved"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "close",
+            "1",
+            "--resolution",
+            "resolved",
+        ])
         .assert()
         .failure()
         .code(3)
@@ -224,13 +327,29 @@ fn test_reopen() {
     let (_dir, db_path) = setup();
 
     tick()
-        .args(["--db", &db_path, "issue", "create", "Reopen test", "--type", "bug"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "create",
+            "Reopen test",
+            "--type",
+            "bug",
+        ])
         .assert()
         .success();
 
     // Close with wontfix from open
     tick()
-        .args(["--db", &db_path, "issue", "close", "1", "--resolution", "wontfix"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "close",
+            "1",
+            "--resolution",
+            "wontfix",
+        ])
         .assert()
         .success()
         .stdout(predicate::str::contains("\"status\":\"closed\""));
@@ -249,13 +368,31 @@ fn test_sub_issue() {
 
     // Create parent
     tick()
-        .args(["--db", &db_path, "issue", "create", "Parent issue", "--type", "feature"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "create",
+            "Parent issue",
+            "--type",
+            "feature",
+        ])
         .assert()
         .success();
 
     // Create child with --parent 1
     tick()
-        .args(["--db", &db_path, "issue", "create", "Child issue", "--type", "bug", "--parent", "1"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "create",
+            "Child issue",
+            "--type",
+            "bug",
+            "--parent",
+            "1",
+        ])
         .assert()
         .success()
         .stdout(predicate::str::contains("\"parent_id\":1"));
@@ -274,12 +411,30 @@ fn test_update_fields() {
     let (_dir, db_path) = setup();
 
     tick()
-        .args(["--db", &db_path, "issue", "create", "Old title", "--type", "bug"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "create",
+            "Old title",
+            "--type",
+            "bug",
+        ])
         .assert()
         .success();
 
     tick()
-        .args(["--db", &db_path, "issue", "update", "1", "--title", "New title", "--priority", "high"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "update",
+            "1",
+            "--title",
+            "New title",
+            "--priority",
+            "high",
+        ])
         .assert()
         .success()
         .stdout(predicate::str::contains("\"title\":\"New title\""))
@@ -291,7 +446,15 @@ fn test_pretty_output() {
     let (_dir, db_path) = setup();
 
     tick()
-        .args(["--db", &db_path, "issue", "create", "Pretty test issue", "--type", "bug"])
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "create",
+            "Pretty test issue",
+            "--type",
+            "bug",
+        ])
         .assert()
         .success();
 

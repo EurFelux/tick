@@ -9,28 +9,28 @@ use tick::error::Result;
 use tick::output::{json as out_json, pretty};
 
 fn main() {
-    // Try to parse CLI args first so we can respect --pretty in error output
-    let pretty_mode = match Cli::try_parse() {
-        Ok(cli) => cli.pretty,
-        Err(_) => false, // CLI parse failure: fall back to JSON errors
+    let cli = match Cli::try_parse() {
+        Ok(cli) => cli,
+        Err(e) => {
+            e.exit();
+        }
     };
-
-    if let Err(e) = run() {
+    let pretty_mode = cli.pretty;
+    if let Err(e) = run(cli) {
         if pretty_mode {
             eprintln!("error: {} (code: {})", e, e.error_code());
         } else {
-            let err_json = json!({
+            let json = serde_json::json!({
                 "error": e.to_string(),
                 "code": e.error_code(),
             });
-            eprintln!("{}", err_json);
+            eprintln!("{}", json);
         }
         std::process::exit(e.exit_code());
     }
 }
 
-fn run() -> Result<()> {
-    let cli = Cli::parse();
+fn run(cli: Cli) -> Result<()> {
     let pretty_mode = cli.pretty;
     let db_path = cli.db.as_deref();
 

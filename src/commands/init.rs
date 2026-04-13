@@ -1,7 +1,7 @@
 use std::path::Path;
 
-use crate::db::Database;
 use crate::db::migrate;
+use crate::db::Database;
 use crate::error::{Result, TickError};
 
 /// Resolve the path to the tick database by asking git for the common git dir.
@@ -33,8 +33,9 @@ pub fn run(db_path: Option<&str>) -> Result<Database> {
 
     // Create parent directory if needed
     if let Some(parent) = Path::new(&path).parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| TickError::Internal(anyhow::anyhow!("failed to create directory: {}", e)))?;
+        std::fs::create_dir_all(parent).map_err(|e| {
+            TickError::Internal(anyhow::anyhow!("failed to create directory: {}", e))
+        })?;
     }
 
     let mut db = Database::open(&path)?;

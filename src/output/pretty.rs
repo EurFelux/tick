@@ -29,7 +29,10 @@ pub fn print_issue_detail(detail: &IssueDetail) {
     print_issue(&detail.issue);
 
     if let Some(ref parent) = detail.parent {
-        println!("parent: #{} [{}] {}", parent.id, parent.status, parent.title);
+        println!(
+            "parent: #{} [{}] {}",
+            parent.id, parent.status, parent.title
+        );
     }
 
     if !detail.children.is_empty() {
@@ -56,7 +59,10 @@ pub fn print_issue_detail(detail: &IssueDetail) {
     if !detail.comments.is_empty() {
         println!("comments:");
         for comment in &detail.comments {
-            println!("  [{}] {}: {}", comment.created_at, comment.role, comment.body);
+            println!(
+                "  [{}] {}: {}",
+                comment.created_at, comment.role, comment.body
+            );
         }
     }
 }

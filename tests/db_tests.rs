@@ -32,7 +32,13 @@ fn test_migrate_is_idempotent() {
 fn test_create_and_get_issue() {
     let (_dir, db) = setup_db();
     let id = db
-        .create_issue("Test Issue", "A description", &IssueType::Bug, &Priority::High, None)
+        .create_issue(
+            "Test Issue",
+            "A description",
+            &IssueType::Bug,
+            &Priority::High,
+            None,
+        )
         .expect("failed to create issue");
 
     let issue = db.get_issue(id).expect("failed to get issue");
@@ -66,8 +72,14 @@ fn test_list_issues_with_filters() {
     let (_dir, db) = setup_db();
     db.create_issue("Bug 1", "", &IssueType::Bug, &Priority::High, None)
         .expect("create bug 1");
-    db.create_issue("Feature 1", "", &IssueType::Feature, &Priority::Medium, None)
-        .expect("create feature 1");
+    db.create_issue(
+        "Feature 1",
+        "",
+        &IssueType::Feature,
+        &Priority::Medium,
+        None,
+    )
+    .expect("create feature 1");
     db.create_issue("Bug 2", "", &IssueType::Bug, &Priority::Low, None)
         .expect("create bug 2");
 
@@ -86,8 +98,14 @@ fn test_list_issues_with_filters() {
 fn test_list_issues_limit_offset() {
     let (_dir, db) = setup_db();
     for i in 0..5 {
-        db.create_issue(&format!("Issue {}", i), "", &IssueType::Feature, &Priority::Medium, None)
-            .expect("create issue");
+        db.create_issue(
+            &format!("Issue {}", i),
+            "",
+            &IssueType::Feature,
+            &Priority::Medium,
+            None,
+        )
+        .expect("create issue");
     }
 
     let filter_page1 = ListFilter {
@@ -114,10 +132,22 @@ fn test_list_issues_limit_offset() {
 fn test_create_sub_issue() {
     let (_dir, db) = setup_db();
     let parent_id = db
-        .create_issue("Parent Issue", "", &IssueType::Feature, &Priority::Medium, None)
+        .create_issue(
+            "Parent Issue",
+            "",
+            &IssueType::Feature,
+            &Priority::Medium,
+            None,
+        )
         .expect("create parent");
     let child_id = db
-        .create_issue("Child Issue", "", &IssueType::Bug, &Priority::Low, Some(parent_id))
+        .create_issue(
+            "Child Issue",
+            "",
+            &IssueType::Bug,
+            &Priority::Low,
+            Some(parent_id),
+        )
         .expect("create child");
 
     let child = db.get_issue(child_id).expect("get child");
@@ -144,7 +174,13 @@ fn test_count_by_status() {
 fn test_create_and_list_comments() {
     let (_dir, db) = setup_db();
     let issue_id = db
-        .create_issue("Issue with comments", "", &IssueType::Feature, &Priority::Medium, None)
+        .create_issue(
+            "Issue with comments",
+            "",
+            &IssueType::Feature,
+            &Priority::Medium,
+            None,
+        )
         .expect("create issue");
 
     let comment1_id = db
@@ -171,7 +207,13 @@ fn test_create_and_list_comments() {
 fn test_list_links_empty() {
     let (_dir, db) = setup_db();
     let issue_id = db
-        .create_issue("Isolated Issue", "", &IssueType::Feature, &Priority::Medium, None)
+        .create_issue(
+            "Isolated Issue",
+            "",
+            &IssueType::Feature,
+            &Priority::Medium,
+            None,
+        )
         .expect("create issue");
 
     let (depends_on, depended_by) = db.list_links(issue_id).expect("list links");
