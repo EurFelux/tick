@@ -190,7 +190,7 @@ fn test_create_and_list_comments() {
         .create_comment(issue_id, "Second comment by worker", &CommentRole::Worker)
         .expect("create comment 2");
 
-    let comments = db.list_comments(issue_id).expect("list comments");
+    let comments = db.list_comments(issue_id, None).expect("list comments");
     assert_eq!(comments.len(), 2);
 
     assert_eq!(comments[0].id, comment1_id);

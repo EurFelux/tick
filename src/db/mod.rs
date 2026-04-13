@@ -136,8 +136,8 @@ impl Database {
         comments::create(&self.conn, issue_id, body, role)
     }
 
-    pub fn list_comments(&self, issue_id: i64) -> Result<Vec<Comment>> {
-        comments::list_by_issue(&self.conn, issue_id)
+    pub fn list_comments(&self, issue_id: i64, role: Option<&CommentRole>) -> Result<Vec<Comment>> {
+        comments::list_by_issue(&self.conn, issue_id, role)
     }
 
     // Link methods

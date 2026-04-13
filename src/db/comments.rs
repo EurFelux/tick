@@ -11,11 +11,20 @@ pub fn create(conn: &Connection, issue_id: i64, body: &str, role: &CommentRole) 
     Ok(conn.last_insert_rowid())
 }
 
-pub fn list_by_issue(conn: &Connection, issue_id: i64) -> Result<Vec<Comment>> {
-    let mut stmt = conn.prepare(
-        "SELECT id, issue_id, body, role, created_at FROM comments WHERE issue_id = ?1 ORDER BY id",
-    )?;
-    let rows = stmt.query_map(rusqlite::params![issue_id], |row| {
+pub fn list_by_issue(
+    conn: &Connection,
+    issue_id: i64,
+    role: Option<&CommentRole>,
+) -> Result<Vec<Comment>> {
+    let sql = if role.is_some() {
+        "SELECT id, issue_id, body, role, created_at FROM comments WHERE issue_id = ?1 AND role = ?2 ORDER BY id"
+    } else {
+        "SELECT id, issue_id, body, role, created_at FROM comments WHERE issue_id = ?1 ORDER BY id"
+    };
+
+    let mut stmt = conn.prepare(sql)?;
+
+    let map_row = |row: &rusqlite::Row| {
         let role_str: String = row.get(3)?;
         Ok((
             row.get::<_, i64>(0)?,
@@ -24,7 +33,15 @@ pub fn list_by_issue(conn: &Connection, issue_id: i64) -> Result<Vec<Comment>> {
             role_str,
             row.get::<_, String>(4)?,
         ))
-    })?;
+    };
+
+    let rows: Vec<_> = if let Some(r) = role {
+        stmt.query_map(rusqlite::params![issue_id, r.to_string()], map_row)?
+            .collect()
+    } else {
+        stmt.query_map(rusqlite::params![issue_id], map_row)?
+            .collect()
+    };
 
     let mut comments = Vec::new();
     for row in rows {

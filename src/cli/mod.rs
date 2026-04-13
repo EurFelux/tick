@@ -2,6 +2,7 @@ pub mod comment;
 pub mod issue;
 
 use clap::Parser;
+use comment::CommentCommands;
 use issue::IssueCommands;
 
 #[derive(Parser)]
@@ -24,4 +25,6 @@ pub enum Commands {
     Status,
     #[command(subcommand)]
     Issue(IssueCommands),
+    #[command(subcommand)]
+    Comment(CommentCommands),
 }

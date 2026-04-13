@@ -73,7 +73,7 @@ pub fn show(db: &Database, id: i64) -> Result<IssueDetail> {
 
     let children = db.get_children(id)?;
     let (depends_on, depended_by) = db.list_links(id)?;
-    let comments = db.list_comments(id)?;
+    let comments = db.list_comments(id, None)?;
 
     Ok(IssueDetail {
         issue,

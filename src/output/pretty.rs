@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::models::{Issue, IssueDetail};
+use crate::models::{Comment, Issue, IssueDetail};
 
 pub fn print_issue(issue: &Issue) {
     println!("id: {}", issue.id);
@@ -81,6 +81,23 @@ pub fn print_status_counts(counts: &HashMap<String, i64>) {
     entries.sort_by_key(|(k, _)| k.as_str());
     for (status, count) in entries {
         println!("{}: {}", status, count);
+    }
+}
+
+pub fn print_comment(comment: &Comment) {
+    println!("id: {}", comment.id);
+    println!("issue_id: {}", comment.issue_id);
+    println!("role: {}", comment.role);
+    println!("body: {}", comment.body);
+    println!("created_at: {}", comment.created_at);
+}
+
+pub fn print_comment_list(comments: &[Comment]) {
+    for c in comments {
+        println!("[{}] {}: {}", c.created_at, c.role, c.body);
+    }
+    if comments.is_empty() {
+        println!("(no comments)");
     }
 }
 

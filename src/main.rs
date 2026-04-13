@@ -1,9 +1,10 @@
 use clap::Parser;
 use serde_json::json;
 
+use tick::cli::comment::CommentCommands;
 use tick::cli::issue::IssueCommands;
 use tick::cli::{Cli, Commands};
-use tick::commands::{init, issue as cmd_issue};
+use tick::commands::{comment as cmd_comment, init, issue as cmd_issue};
 use tick::db::migrate;
 use tick::error::Result;
 use tick::output::{json as out_json, pretty};
@@ -69,6 +70,32 @@ fn run(cli: Cli) -> Result<()> {
                 pretty::print_status_counts(&counts);
             } else {
                 out_json::print(&counts);
+            }
+        }
+
+        Commands::Comment(cmd) => {
+            let db = init::open_db(db_path)?;
+            match cmd {
+                CommentCommands::Add {
+                    issue_id,
+                    body,
+                    role,
+                } => {
+                    let comment = cmd_comment::add(&db, issue_id, &body, &role)?;
+                    if pretty_mode {
+                        pretty::print_comment(&comment);
+                    } else {
+                        out_json::print(&comment);
+                    }
+                }
+                CommentCommands::List { issue_id, role } => {
+                    let comments = cmd_comment::list(&db, issue_id, role.as_deref())?;
+                    if pretty_mode {
+                        pretty::print_comment_list(&comments);
+                    } else {
+                        out_json::print(&comments);
+                    }
+                }
             }
         }
 

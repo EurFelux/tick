@@ -624,3 +624,88 @@ fn test_empty_database_status() {
         .stdout(predicate::str::contains("\"open\":0"))
         .stdout(predicate::str::contains("\"closed\":0"));
 }
+
+#[test]
+fn test_comment_add_and_list() {
+    let (_dir, db_path) = setup();
+
+    // Create an issue to comment on
+    tick()
+        .args([
+            "--db", &db_path, "issue", "create", "Comment test issue", "--type", "bug",
+        ])
+        .assert()
+        .success();
+
+    // Add a comment with role worker
+    tick()
+        .args([
+            "--db", &db_path, "comment", "add", "1", "First comment", "--role", "worker",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("First comment"))
+        .stdout(predicate::str::contains("\"role\":\"worker\""));
+
+    // Add a comment with role reviewer
+    tick()
+        .args([
+            "--db", &db_path, "comment", "add", "1", "LGTM", "--role", "reviewer",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("LGTM"))
+        .stdout(predicate::str::contains("\"role\":\"reviewer\""));
+
+    // List all comments — should have both
+    let output = tick()
+        .args(["--db", &db_path, "comment", "list", "1"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stdout = String::from_utf8_lossy(&output);
+    assert!(stdout.contains("First comment"), "should contain first comment");
+    assert!(stdout.contains("LGTM"), "should contain second comment");
+
+    // Filter by role worker — should only have first comment
+    let output = tick()
+        .args(["--db", &db_path, "comment", "list", "1", "--role", "worker"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let filtered = String::from_utf8_lossy(&output);
+    assert!(filtered.contains("First comment"), "should contain worker comment");
+    assert!(!filtered.contains("LGTM"), "should NOT contain reviewer comment");
+
+    // Filter by role reviewer — should only have LGTM
+    let output = tick()
+        .args(["--db", &db_path, "comment", "list", "1", "--role", "reviewer"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let reviewer_filtered = String::from_utf8_lossy(&output);
+    assert!(reviewer_filtered.contains("LGTM"), "should contain reviewer comment");
+    assert!(!reviewer_filtered.contains("First comment"), "should NOT contain worker comment");
+}
+
+#[test]
+fn test_comment_add_nonexistent_issue() {
+    let (_dir, db_path) = setup();
+
+    // Attempt to add a comment to a non-existent issue
+    tick()
+        .args(["--db", &db_path, "comment", "add", "999", "This should fail"])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains("NOT_FOUND"));
+}
