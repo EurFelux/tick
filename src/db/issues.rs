@@ -20,21 +20,11 @@ fn row_to_issue(row: &Row) -> rusqlite::Result<Issue> {
     let priority_str: String = row.get(6)?;
     let resolution_str: Option<String> = row.get(7)?;
 
-    let status = status_str
-        .parse::<IssueStatus>()
-        .map_err(rusqlite::Error::InvalidColumnName)?;
-    let issue_type = type_str
-        .parse::<IssueType>()
-        .map_err(rusqlite::Error::InvalidColumnName)?;
-    let priority = priority_str
-        .parse::<Priority>()
-        .map_err(rusqlite::Error::InvalidColumnName)?;
-    let resolution = resolution_str
-        .map(|s| {
-            s.parse::<Resolution>()
-                .map_err(rusqlite::Error::InvalidColumnName)
-        })
-        .transpose()?;
+    // CHECK constraints guarantee valid enum values; panic if DB is corrupted
+    let status: IssueStatus = status_str.parse().expect("invalid status in DB");
+    let issue_type: IssueType = type_str.parse().expect("invalid type in DB");
+    let priority: Priority = priority_str.parse().expect("invalid priority in DB");
+    let resolution: Option<Resolution> = resolution_str.map(|s| s.parse().expect("invalid resolution in DB"));
 
     Ok(Issue {
         id: row.get(0)?,
