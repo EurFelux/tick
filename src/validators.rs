@@ -102,12 +102,18 @@ pub fn validate_link(db: &Database, from_id: i64, to_id: i64) -> Result<()> {
 
     check_dependency_cycle(db, from_id, to_id)?;
 
-    // Dependency must not be in a wontfix state (unresolvable)
-    let dep = db.get_issue(to_id)?;
-    if dep.status == IssueStatus::Closed && dep.resolution == Some(Resolution::Wontfix) {
-        return Err(TickError::InvalidArgument(format!(
-            "cannot depend on issue #{to_id}: it is closed as wontfix"
-        )));
+    // If from issue is non-open, the to issue must be closed(resolved)
+    let from_issue = db.get_issue(from_id)?;
+    if from_issue.status != IssueStatus::Open {
+        let to_issue = db.get_issue(to_id)?;
+        if to_issue.status != IssueStatus::Closed
+            || to_issue.resolution != Some(Resolution::Resolved)
+        {
+            return Err(TickError::InvalidArgument(format!(
+                "issue #{from_id} is '{}': dependency #{to_id} must be closed(resolved)",
+                from_issue.status
+            )));
+        }
     }
 
     Ok(())

@@ -105,16 +105,24 @@ fn run(cli: Cli) -> Result<()> {
                     body,
                     role,
                 } => {
-                    let comment = cmd_comment::add(&db, issue_id, &body, &role)?;
-                    if quiet {
-                        println!("{}", comment.id);
-                    } else if let Some(ref field_list) = fields {
-                        let refs: Vec<&str> = field_list.iter().map(|s| s.as_str()).collect();
-                        out_json::print_filtered(&comment, &refs);
-                    } else if pretty_mode {
-                        pretty::print_comment(&comment);
+                    if dry_run {
+                        // Validate issue exists and role is valid
+                        db.get_issue(issue_id)?;
+                        role.parse::<tick::models::CommentRole>()
+                            .map_err(tick::error::TickError::InvalidArgument)?;
+                        out_json::print(&json!({"dry_run": true, "would_succeed": true}));
                     } else {
-                        out_json::print(&comment);
+                        let comment = cmd_comment::add(&db, issue_id, &body, &role)?;
+                        if quiet {
+                            println!("{}", comment.id);
+                        } else if let Some(ref field_list) = fields {
+                            let refs: Vec<&str> = field_list.iter().map(|s| s.as_str()).collect();
+                            out_json::print_filtered(&comment, &refs);
+                        } else if pretty_mode {
+                            pretty::print_comment(&comment);
+                        } else {
+                            out_json::print(&comment);
+                        }
                     }
                 }
                 CommentCommands::List { issue_id, role } => {
@@ -137,11 +145,23 @@ fn run(cli: Cli) -> Result<()> {
 
         Commands::Config(args) => {
             let db = init::open_db(db_path)?;
-            let result = cmd_config::run(&db, args.set.as_deref(), args.get.as_deref(), args.list)?;
-            if pretty_mode {
-                pretty::print_config(&result);
+            if dry_run && args.set.is_some() {
+                // Validate key=value format without writing
+                let kv = args.set.as_deref().unwrap();
+                kv.split_once('=').ok_or_else(|| {
+                    tick::error::TickError::InvalidArgument(
+                        "--set requires key=value format".to_string(),
+                    )
+                })?;
+                out_json::print(&json!({"dry_run": true, "would_succeed": true}));
             } else {
-                out_json::print(&result);
+                let result =
+                    cmd_config::run(&db, args.set.as_deref(), args.get.as_deref(), args.list)?;
+                if pretty_mode {
+                    pretty::print_config(&result);
+                } else {
+                    out_json::print(&result);
+                }
             }
         }
 
@@ -225,6 +245,19 @@ fn run(cli: Cli) -> Result<()> {
                     if dry_run {
                         // Check issue exists
                         db.get_issue(id)?;
+                        // Parse and validate enum strings
+                        if let Some(ref it) = issue_type {
+                            it.parse::<tick::models::IssueType>()
+                                .map_err(tick::error::TickError::InvalidArgument)?;
+                        }
+                        if let Some(ref p) = priority {
+                            p.parse::<tick::models::Priority>()
+                                .map_err(tick::error::TickError::InvalidArgument)?;
+                        }
+                        // Validate parent cycle if parent is provided
+                        if let Some(new_parent) = parent {
+                            tick::validators::validate_parent_no_cycle(&db, id, new_parent)?;
+                        }
                         out_json::print(&json!({"dry_run": true, "would_succeed": true}));
                     } else {
                         let issue = cmd_issue::update(
@@ -257,7 +290,13 @@ fn run(cli: Cli) -> Result<()> {
 
                 IssueCommands::Done { id, expect_version } => {
                     if dry_run {
-                        db.get_issue(id)?;
+                        let issue = db.get_issue(id)?;
+                        if issue.status != tick::models::IssueStatus::InProgress {
+                            return Err(tick::error::TickError::Conflict(format!(
+                                "issue #{id} is '{}': expected 'in-progress'",
+                                issue.status
+                            )));
+                        }
                         out_json::print(&json!({"dry_run": true, "would_succeed": true}));
                     } else {
                         let issue = cmd_issue::done(&db, id, expect_version)?;
@@ -294,7 +333,13 @@ fn run(cli: Cli) -> Result<()> {
 
                 IssueCommands::Reopen { id, expect_version } => {
                     if dry_run {
-                        db.get_issue(id)?;
+                        let issue = db.get_issue(id)?;
+                        if issue.status != tick::models::IssueStatus::Closed {
+                            return Err(tick::error::TickError::Conflict(format!(
+                                "issue #{id} is '{}': expected 'closed'",
+                                issue.status
+                            )));
+                        }
                         out_json::print(&json!({"dry_run": true, "would_succeed": true}));
                     } else {
                         let issue = cmd_issue::reopen(&db, id, expect_version)?;
@@ -327,13 +372,32 @@ fn run(cli: Cli) -> Result<()> {
                     relation,
                     to_id,
                 } => {
-                    let result = cmd_issue::link(&db, from_id, &relation, to_id)?;
-                    out_json::print(&result);
+                    if dry_run {
+                        if relation != "depends-on" {
+                            return Err(tick::error::TickError::InvalidArgument(format!(
+                                "unknown relation '{}', only 'depends-on' is supported",
+                                relation
+                            )));
+                        }
+                        db.get_issue(from_id)?;
+                        db.get_issue(to_id)?;
+                        tick::validators::validate_link(&db, from_id, to_id)?;
+                        out_json::print(&json!({"dry_run": true, "would_succeed": true}));
+                    } else {
+                        let result = cmd_issue::link(&db, from_id, &relation, to_id)?;
+                        out_json::print(&result);
+                    }
                 }
 
                 IssueCommands::Unlink { from_id, to_id } => {
-                    let result = cmd_issue::unlink(&db, from_id, to_id)?;
-                    out_json::print(&result);
+                    if dry_run {
+                        db.get_issue(from_id)?;
+                        db.get_issue(to_id)?;
+                        out_json::print(&json!({"dry_run": true, "would_succeed": true}));
+                    } else {
+                        let result = cmd_issue::unlink(&db, from_id, to_id)?;
+                        out_json::print(&result);
+                    }
                 }
 
                 IssueCommands::BatchCreate => {

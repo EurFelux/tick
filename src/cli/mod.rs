@@ -17,11 +17,11 @@ pub struct Cli {
     pub db: Option<String>,
 
     /// Comma-separated list of fields to include in output
-    #[arg(long, global = true)]
+    #[arg(long, global = true, conflicts_with = "quiet")]
     pub fields: Option<String>,
 
     /// Print only the id (for write commands) or one id per line (for list commands)
-    #[arg(long, global = true)]
+    #[arg(long, global = true, conflicts_with_all = ["fields", "pretty"])]
     pub quiet: bool,
 
     /// Validate without writing to the database

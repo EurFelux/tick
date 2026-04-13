@@ -4,26 +4,30 @@ use crate::error::{Result, TickError};
 use crate::models::{IssueStatus, IssueSummary};
 
 pub fn create(conn: &Connection, from_id: i64, to_id: i64) -> Result<()> {
-    conn.execute(
+    let tx = conn.unchecked_transaction()?;
+    tx.execute(
         "INSERT INTO issue_links (from_issue_id, to_issue_id, relation) VALUES (?1, ?2, 'depends-on')",
         params![from_id, to_id],
     )?;
-    conn.execute(
+    tx.execute(
         "INSERT INTO issue_links (from_issue_id, to_issue_id, relation) VALUES (?1, ?2, 'depended-by')",
         params![to_id, from_id],
     )?;
+    tx.commit()?;
     Ok(())
 }
 
 pub fn delete(conn: &Connection, from_id: i64, to_id: i64) -> Result<()> {
-    let deleted = conn.execute(
+    let tx = conn.unchecked_transaction()?;
+    let deleted = tx.execute(
         "DELETE FROM issue_links WHERE from_issue_id = ?1 AND to_issue_id = ?2 AND relation = 'depends-on'",
         params![from_id, to_id],
     )?;
-    conn.execute(
+    tx.execute(
         "DELETE FROM issue_links WHERE from_issue_id = ?1 AND to_issue_id = ?2 AND relation = 'depended-by'",
         params![to_id, from_id],
     )?;
+    tx.commit()?;
     if deleted == 0 {
         return Err(TickError::NotFound(format!(
             "link from #{from_id} to #{to_id} not found"
