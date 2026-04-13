@@ -178,7 +178,30 @@ pub fn close(
         db.create_comment(id, body, &crole)?;
     }
 
+    if res == Resolution::Wontfix {
+        validators::cascade_wontfix(db, id)?;
+    }
+
     Ok(updated)
+}
+
+pub fn link(db: &Database, from_id: i64, relation: &str, to_id: i64) -> Result<serde_json::Value> {
+    if relation != "depends-on" {
+        return Err(TickError::InvalidArgument(format!(
+            "unknown relation '{}', only 'depends-on' is supported",
+            relation
+        )));
+    }
+    db.get_issue(from_id)?;
+    db.get_issue(to_id)?;
+    validators::validate_link(db, from_id, to_id)?;
+    db.create_link(from_id, to_id)?;
+    Ok(serde_json::json!({"linked": true, "from": from_id, "to": to_id, "relation": "depends-on"}))
+}
+
+pub fn unlink(db: &Database, from_id: i64, to_id: i64) -> Result<serde_json::Value> {
+    db.delete_link(from_id, to_id)?;
+    Ok(serde_json::json!({"unlinked": true, "from": from_id, "to": to_id}))
 }
 
 pub fn reopen(db: &Database, id: i64) -> Result<Issue> {

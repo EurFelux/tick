@@ -709,3 +709,218 @@ fn test_comment_add_nonexistent_issue() {
         .code(2)
         .stderr(predicate::str::contains("NOT_FOUND"));
 }
+
+#[test]
+fn test_link_and_show() {
+    let (_dir, db_path) = setup();
+
+    // Create two issues
+    tick()
+        .args(["--db", &db_path, "issue", "create", "Base feature", "--type", "feature"])
+        .assert()
+        .success();
+    tick()
+        .args(["--db", &db_path, "issue", "create", "Dependent task", "--type", "bug"])
+        .assert()
+        .success();
+
+    // Link: issue 2 depends-on issue 1
+    tick()
+        .args(["--db", &db_path, "issue", "link", "2", "depends-on", "1"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"linked\":true"))
+        .stdout(predicate::str::contains("\"from\":2"))
+        .stdout(predicate::str::contains("\"to\":1"));
+
+    // Show issue 2 — depends_on should contain issue 1
+    tick()
+        .args(["--db", &db_path, "issue", "show", "2"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"depends_on\""))
+        .stdout(predicate::str::contains("Base feature"));
+}
+
+#[test]
+fn test_link_self_reference_rejected() {
+    let (_dir, db_path) = setup();
+
+    tick()
+        .args(["--db", &db_path, "issue", "create", "Self ref test", "--type", "bug"])
+        .assert()
+        .success();
+
+    // Linking an issue to itself should fail with exit code 3
+    tick()
+        .args(["--db", &db_path, "issue", "link", "1", "depends-on", "1"])
+        .assert()
+        .failure()
+        .code(3)
+        .stderr(predicate::str::contains("INVALID_ARGUMENT"));
+}
+
+#[test]
+fn test_link_cycle_rejected() {
+    let (_dir, db_path) = setup();
+
+    tick()
+        .args(["--db", &db_path, "issue", "create", "Issue A", "--type", "feature"])
+        .assert()
+        .success();
+    tick()
+        .args(["--db", &db_path, "issue", "create", "Issue B", "--type", "feature"])
+        .assert()
+        .success();
+
+    // A depends-on B
+    tick()
+        .args(["--db", &db_path, "issue", "link", "1", "depends-on", "2"])
+        .assert()
+        .success();
+
+    // B depends-on A should fail — cycle
+    tick()
+        .args(["--db", &db_path, "issue", "link", "2", "depends-on", "1"])
+        .assert()
+        .failure()
+        .code(3)
+        .stderr(predicate::str::contains("INVALID_ARGUMENT"));
+}
+
+#[test]
+fn test_unlink() {
+    let (_dir, db_path) = setup();
+
+    tick()
+        .args(["--db", &db_path, "issue", "create", "Issue X", "--type", "feature"])
+        .assert()
+        .success();
+    tick()
+        .args(["--db", &db_path, "issue", "create", "Issue Y", "--type", "feature"])
+        .assert()
+        .success();
+
+    // Link
+    tick()
+        .args(["--db", &db_path, "issue", "link", "2", "depends-on", "1"])
+        .assert()
+        .success();
+
+    // Unlink
+    tick()
+        .args(["--db", &db_path, "issue", "unlink", "2", "1"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"unlinked\":true"));
+
+    // Show issue 2 — depends_on should now be empty (no "Issue X" in depends_on list)
+    let output = tick()
+        .args(["--db", &db_path, "issue", "show", "2"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stdout = String::from_utf8_lossy(&output);
+    // depends_on array should be empty
+    assert!(
+        stdout.contains("\"depends_on\":[]"),
+        "depends_on should be empty after unlink, got: {stdout}"
+    );
+}
+
+#[test]
+fn test_start_blocked_by_unresolved_dependency() {
+    let (_dir, db_path) = setup();
+
+    // Create dependency (open) and dependent
+    tick()
+        .args(["--db", &db_path, "issue", "create", "Blocker issue", "--type", "feature"])
+        .assert()
+        .success();
+    tick()
+        .args(["--db", &db_path, "issue", "create", "Blocked issue", "--type", "bug"])
+        .assert()
+        .success();
+
+    // Issue 2 depends-on issue 1 (still open)
+    tick()
+        .args(["--db", &db_path, "issue", "link", "2", "depends-on", "1"])
+        .assert()
+        .success();
+
+    // Try to start issue 2 — should fail because issue 1 is not closed
+    tick()
+        .args(["--db", &db_path, "issue", "start", "2", "--branch", "fix/blocked"])
+        .assert()
+        .failure()
+        .code(3)
+        .stderr(predicate::str::contains("INVALID_ARGUMENT"));
+}
+
+#[test]
+fn test_cascade_wontfix() {
+    let (_dir, db_path) = setup();
+
+    // Create base issue and two dependents
+    tick()
+        .args(["--db", &db_path, "issue", "create", "Base issue", "--type", "feature"])
+        .assert()
+        .success();
+    tick()
+        .args(["--db", &db_path, "issue", "create", "Dependent A", "--type", "bug"])
+        .assert()
+        .success();
+    tick()
+        .args(["--db", &db_path, "issue", "create", "Dependent B", "--type", "bug"])
+        .assert()
+        .success();
+
+    // Both dependents depend on base issue
+    tick()
+        .args(["--db", &db_path, "issue", "link", "2", "depends-on", "1"])
+        .assert()
+        .success();
+    tick()
+        .args(["--db", &db_path, "issue", "link", "3", "depends-on", "1"])
+        .assert()
+        .success();
+
+    // Wontfix the base issue
+    tick()
+        .args(["--db", &db_path, "issue", "close", "1", "--resolution", "wontfix"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"status\":\"closed\""))
+        .stdout(predicate::str::contains("\"resolution\":\"wontfix\""));
+
+    // Both dependents should be closed
+    tick()
+        .args(["--db", &db_path, "issue", "show", "2"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"status\":\"closed\""))
+        .stdout(predicate::str::contains("\"resolution\":\"wontfix\""));
+
+    tick()
+        .args(["--db", &db_path, "issue", "show", "3"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"status\":\"closed\""))
+        .stdout(predicate::str::contains("\"resolution\":\"wontfix\""));
+
+    // Dependents should have system comment from cascade
+    tick()
+        .args(["--db", &db_path, "comment", "list", "2"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Closed by cascade: dependency #1 was abandoned"));
+
+    tick()
+        .args(["--db", &db_path, "comment", "list", "3"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Closed by cascade: dependency #1 was abandoned"));
+}

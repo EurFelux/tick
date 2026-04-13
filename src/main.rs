@@ -223,6 +223,20 @@ fn run(cli: Cli) -> Result<()> {
                         out_json::print(&issue);
                     }
                 }
+
+                IssueCommands::Link {
+                    from_id,
+                    relation,
+                    to_id,
+                } => {
+                    let result = cmd_issue::link(&db, from_id, &relation, to_id)?;
+                    out_json::print(&result);
+                }
+
+                IssueCommands::Unlink { from_id, to_id } => {
+                    let result = cmd_issue::unlink(&db, from_id, to_id)?;
+                    out_json::print(&result);
+                }
             }
         }
     }

@@ -126,4 +126,18 @@ pub enum IssueCommands {
         /// Issue ID
         id: i64,
     },
+
+    /// Create a dependency link
+    Link {
+        from_id: i64,
+        /// Must be "depends-on"
+        relation: String,
+        to_id: i64,
+    },
+
+    /// Remove a dependency link
+    Unlink {
+        from_id: i64,
+        to_id: i64,
+    },
 }

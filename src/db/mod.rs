@@ -145,4 +145,16 @@ impl Database {
     pub fn list_links(&self, issue_id: i64) -> Result<(Vec<IssueSummary>, Vec<IssueSummary>)> {
         links::list_by_issue(&self.conn, issue_id)
     }
+
+    pub fn create_link(&self, from_id: i64, to_id: i64) -> Result<()> {
+        links::create(&self.conn, from_id, to_id)
+    }
+
+    pub fn delete_link(&self, from_id: i64, to_id: i64) -> Result<()> {
+        links::delete(&self.conn, from_id, to_id)
+    }
+
+    pub fn get_depended_by_ids(&self, issue_id: i64) -> Result<Vec<i64>> {
+        links::get_depended_by_ids(&self.conn, issue_id)
+    }
 }
