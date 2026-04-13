@@ -1,6 +1,3 @@
-mod error;
-mod models;
-
 fn main() {
     if let Err(e) = run() {
         let json = serde_json::json!({
@@ -12,6 +9,6 @@ fn main() {
     }
 }
 
-fn run() -> error::Result<()> {
+fn run() -> tick::error::Result<()> {
     Ok(())
 }
