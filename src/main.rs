@@ -1,4 +1,5 @@
 mod error;
+mod models;
 
 fn main() {
     if let Err(e) = run() {
