@@ -465,3 +465,162 @@ fn test_pretty_output() {
         .stdout(predicate::str::contains("id: 1"))
         .stdout(predicate::str::contains("title:"));
 }
+
+#[test]
+fn test_close_with_comment() {
+    let (_dir, db_path) = setup();
+
+    // Create issue
+    tick()
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "create",
+            "Comment close test",
+            "--type",
+            "bug",
+        ])
+        .assert()
+        .success();
+
+    // Start with branch
+    tick()
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "start",
+            "1",
+            "--branch",
+            "fix/comment-close",
+        ])
+        .assert()
+        .success();
+
+    // Done
+    tick()
+        .args(["--db", &db_path, "issue", "done", "1"])
+        .assert()
+        .success();
+
+    // Close with comment and role reviewer
+    tick()
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "close",
+            "1",
+            "-c",
+            "LGTM",
+            "--role",
+            "reviewer",
+            "--resolution",
+            "resolved",
+        ])
+        .assert()
+        .success();
+
+    // Show issue and verify the comment appears
+    tick()
+        .args(["--db", &db_path, "issue", "show", "1"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("LGTM"));
+}
+
+#[test]
+fn test_reopen_clears_branch_and_resolution() {
+    let (_dir, db_path) = setup();
+
+    // Create issue
+    tick()
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "create",
+            "Reopen clears test",
+            "--type",
+            "bug",
+        ])
+        .assert()
+        .success();
+
+    // Start with branch
+    tick()
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "start",
+            "1",
+            "--branch",
+            "fix/reopen-clears",
+        ])
+        .assert()
+        .success();
+
+    // Done
+    tick()
+        .args(["--db", &db_path, "issue", "done", "1"])
+        .assert()
+        .success();
+
+    // Close with resolved
+    tick()
+        .args([
+            "--db",
+            &db_path,
+            "issue",
+            "close",
+            "1",
+            "--resolution",
+            "resolved",
+        ])
+        .assert()
+        .success();
+
+    // Reopen
+    tick()
+        .args(["--db", &db_path, "issue", "reopen", "1"])
+        .assert()
+        .success();
+
+    // Show the issue and verify status is open, branch is null, resolution is null
+    let output = tick()
+        .args(["--db", &db_path, "issue", "show", "1"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stdout = String::from_utf8_lossy(&output);
+    assert!(
+        stdout.contains("\"status\":\"open\""),
+        "status should be open after reopen"
+    );
+    assert!(
+        stdout.contains("\"branch\":null"),
+        "branch should be null after reopen"
+    );
+    assert!(
+        stdout.contains("\"resolution\":null"),
+        "resolution should be null after reopen"
+    );
+}
+
+#[test]
+fn test_empty_database_status() {
+    let (_dir, db_path) = setup();
+
+    // Run status with no issues created
+    tick()
+        .args(["--db", &db_path, "status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"open\":0"))
+        .stdout(predicate::str::contains("\"closed\":0"));
+}

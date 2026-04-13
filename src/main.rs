@@ -18,7 +18,7 @@ fn main() {
     let pretty_mode = cli.pretty;
     if let Err(e) = run(cli) {
         if pretty_mode {
-            eprintln!("error: {} (code: {})", e, e.error_code());
+            pretty::print_error(&e.to_string());
         } else {
             let json = serde_json::json!({
                 "error": e.to_string(),

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::models::{Issue, IssueDetail, IssueSummary};
+use crate::models::{Issue, IssueDetail};
 
 pub fn print_issue(issue: &Issue) {
     println!("id: {}", issue.id);
@@ -73,12 +73,6 @@ pub fn print_issue_list(issues: &[Issue]) {
             "#{} [{}] [{}] [{}] {}",
             issue.id, issue.status, issue.issue_type, issue.priority, issue.title
         );
-    }
-}
-
-pub fn print_summary_list(issues: &[IssueSummary]) {
-    for issue in issues {
-        println!("#{} [{}] {}", issue.id, issue.status, issue.title);
     }
 }
 
