@@ -990,3 +990,77 @@ fn test_expect_version_not_provided() {
         .success()
         .stdout(predicate::str::contains("\"title\":\"New title\""));
 }
+
+#[test]
+fn test_fields_filter() {
+    let (_dir, db_path) = setup();
+
+    tick()
+        .args([
+            "--db", &db_path, "issue", "create", "Fields test", "--type", "bug",
+        ])
+        .assert()
+        .success();
+
+    let output = tick()
+        .args([
+            "--db", &db_path, "--fields", "id,title", "issue", "show", "1",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stdout = String::from_utf8_lossy(&output);
+    assert!(stdout.contains("\"id\""), "output should contain id");
+    assert!(stdout.contains("\"title\""), "output should contain title");
+    assert!(!stdout.contains("\"status\""), "output should NOT contain status");
+}
+
+#[test]
+fn test_quiet_mode() {
+    let (_dir, db_path) = setup();
+
+    let output = tick()
+        .args([
+            "--db", &db_path, "--quiet", "issue", "create", "Quiet test", "--type", "bug",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let stdout = String::from_utf8_lossy(&output);
+    assert_eq!(stdout.trim(), "1", "quiet mode should output just the id");
+}
+
+#[test]
+fn test_dry_run_start() {
+    let (_dir, db_path) = setup();
+
+    tick()
+        .args([
+            "--db", &db_path, "issue", "create", "Dry run test", "--type", "bug",
+        ])
+        .assert()
+        .success();
+
+    // dry-run start — should succeed and output dry_run info, NOT change status
+    tick()
+        .args([
+            "--db", &db_path, "--dry-run", "issue", "start", "1", "--branch", "fix/dry",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"dry_run\":true"))
+        .stdout(predicate::str::contains("\"would_succeed\":true"));
+
+    // Issue should still be open
+    tick()
+        .args(["--db", &db_path, "issue", "show", "1"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"status\":\"open\""));
+}

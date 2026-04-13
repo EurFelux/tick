@@ -7,6 +7,7 @@ use tick::cli::{Cli, Commands};
 use tick::commands::{comment as cmd_comment, init, issue as cmd_issue};
 use tick::db::migrate;
 use tick::error::Result;
+use tick::models::Issue;
 use tick::output::{json as out_json, pretty};
 
 fn main() {
@@ -31,9 +32,37 @@ fn main() {
     }
 }
 
+fn print_issue_output(
+    issue: &Issue,
+    pretty_mode: bool,
+    quiet: bool,
+    fields: &Option<Vec<String>>,
+) {
+    if quiet {
+        println!("{}", issue.id);
+    } else if let Some(ref field_list) = fields {
+        let refs: Vec<&str> = field_list.iter().map(|s| s.as_str()).collect();
+        out_json::print_filtered(issue, &refs);
+    } else if pretty_mode {
+        pretty::print_issue(issue);
+    } else {
+        out_json::print(issue);
+    }
+}
+
 fn run(cli: Cli) -> Result<()> {
     let pretty_mode = cli.pretty;
     let db_path = cli.db.as_deref();
+    let quiet = cli.quiet;
+    let dry_run = cli.dry_run;
+    // --quiet takes precedence over --fields
+    let fields: Option<Vec<String>> = if quiet {
+        None
+    } else {
+        cli.fields
+            .as_deref()
+            .map(|f| f.split(',').map(|s| s.trim().to_string()).collect())
+    };
 
     match cli.command {
         Commands::Init => {
@@ -82,7 +111,12 @@ fn run(cli: Cli) -> Result<()> {
                     role,
                 } => {
                     let comment = cmd_comment::add(&db, issue_id, &body, &role)?;
-                    if pretty_mode {
+                    if quiet {
+                        println!("{}", comment.id);
+                    } else if let Some(ref field_list) = fields {
+                        let refs: Vec<&str> = field_list.iter().map(|s| s.as_str()).collect();
+                        out_json::print_filtered(&comment, &refs);
+                    } else if pretty_mode {
                         pretty::print_comment(&comment);
                     } else {
                         out_json::print(&comment);
@@ -90,7 +124,14 @@ fn run(cli: Cli) -> Result<()> {
                 }
                 CommentCommands::List { issue_id, role } => {
                     let comments = cmd_comment::list(&db, issue_id, role.as_deref())?;
-                    if pretty_mode {
+                    if quiet {
+                        for c in &comments {
+                            println!("{}", c.id);
+                        }
+                    } else if let Some(ref field_list) = fields {
+                        let refs: Vec<&str> = field_list.iter().map(|s| s.as_str()).collect();
+                        out_json::print_filtered(&comments, &refs);
+                    } else if pretty_mode {
                         pretty::print_comment_list(&comments);
                     } else {
                         out_json::print(&comments);
@@ -117,11 +158,7 @@ fn run(cli: Cli) -> Result<()> {
                         &priority,
                         parent,
                     )?;
-                    if pretty_mode {
-                        pretty::print_issue(&issue);
-                    } else {
-                        out_json::print(&issue);
-                    }
+                    print_issue_output(&issue, pretty_mode, quiet, &fields);
                 }
 
                 IssueCommands::List {
@@ -143,7 +180,14 @@ fn run(cli: Cli) -> Result<()> {
                         limit,
                         offset,
                     )?;
-                    if pretty_mode {
+                    if quiet {
+                        for issue in &issues {
+                            println!("{}", issue.id);
+                        }
+                    } else if let Some(ref field_list) = fields {
+                        let refs: Vec<&str> = field_list.iter().map(|s| s.as_str()).collect();
+                        out_json::print_filtered(&issues, &refs);
+                    } else if pretty_mode {
                         pretty::print_issue_list(&issues);
                     } else {
                         out_json::print(&issues);
@@ -152,7 +196,12 @@ fn run(cli: Cli) -> Result<()> {
 
                 IssueCommands::Show { id } => {
                     let detail = cmd_issue::show(&db, id)?;
-                    if pretty_mode {
+                    if quiet {
+                        println!("{}", detail.issue.id);
+                    } else if let Some(ref field_list) = fields {
+                        let refs: Vec<&str> = field_list.iter().map(|s| s.as_str()).collect();
+                        out_json::print_filtered(&detail, &refs);
+                    } else if pretty_mode {
                         pretty::print_issue_detail(&detail);
                     } else {
                         out_json::print(&detail);
@@ -168,38 +217,42 @@ fn run(cli: Cli) -> Result<()> {
                     parent,
                     expect_version,
                 } => {
-                    let issue = cmd_issue::update(
-                        &db,
-                        id,
-                        title.as_deref(),
-                        description.as_deref(),
-                        issue_type.as_deref(),
-                        priority.as_deref(),
-                        parent,
-                        expect_version,
-                    )?;
-                    if pretty_mode {
-                        pretty::print_issue(&issue);
+                    if dry_run {
+                        // Check issue exists
+                        db.get_issue(id)?;
+                        out_json::print(&json!({"dry_run": true, "would_succeed": true}));
                     } else {
-                        out_json::print(&issue);
+                        let issue = cmd_issue::update(
+                            &db,
+                            id,
+                            title.as_deref(),
+                            description.as_deref(),
+                            issue_type.as_deref(),
+                            priority.as_deref(),
+                            parent,
+                            expect_version,
+                        )?;
+                        print_issue_output(&issue, pretty_mode, quiet, &fields);
                     }
                 }
 
                 IssueCommands::Start { id, branch, expect_version } => {
-                    let issue = cmd_issue::start(&db, id, &branch, expect_version)?;
-                    if pretty_mode {
-                        pretty::print_issue(&issue);
+                    if dry_run {
+                        tick::validators::validate_start(&db, id, &branch)?;
+                        out_json::print(&json!({"dry_run": true, "would_succeed": true}));
                     } else {
-                        out_json::print(&issue);
+                        let issue = cmd_issue::start(&db, id, &branch, expect_version)?;
+                        print_issue_output(&issue, pretty_mode, quiet, &fields);
                     }
                 }
 
                 IssueCommands::Done { id, expect_version } => {
-                    let issue = cmd_issue::done(&db, id, expect_version)?;
-                    if pretty_mode {
-                        pretty::print_issue(&issue);
+                    if dry_run {
+                        db.get_issue(id)?;
+                        out_json::print(&json!({"dry_run": true, "would_succeed": true}));
                     } else {
-                        out_json::print(&issue);
+                        let issue = cmd_issue::done(&db, id, expect_version)?;
+                        print_issue_output(&issue, pretty_mode, quiet, &fields);
                     }
                 }
 
@@ -210,20 +263,33 @@ fn run(cli: Cli) -> Result<()> {
                     resolution,
                     expect_version,
                 } => {
-                    let issue = cmd_issue::close(&db, id, comment.as_deref(), &role, &resolution, expect_version)?;
-                    if pretty_mode {
-                        pretty::print_issue(&issue);
+                    if dry_run {
+                        let issue = db.get_issue(id)?;
+                        let res = resolution
+                            .parse::<tick::models::Resolution>()
+                            .map_err(tick::error::TickError::InvalidArgument)?;
+                        tick::validators::validate_close_resolution(&issue.status, &res)?;
+                        out_json::print(&json!({"dry_run": true, "would_succeed": true}));
                     } else {
-                        out_json::print(&issue);
+                        let issue = cmd_issue::close(
+                            &db,
+                            id,
+                            comment.as_deref(),
+                            &role,
+                            &resolution,
+                            expect_version,
+                        )?;
+                        print_issue_output(&issue, pretty_mode, quiet, &fields);
                     }
                 }
 
                 IssueCommands::Reopen { id, expect_version } => {
-                    let issue = cmd_issue::reopen(&db, id, expect_version)?;
-                    if pretty_mode {
-                        pretty::print_issue(&issue);
+                    if dry_run {
+                        db.get_issue(id)?;
+                        out_json::print(&json!({"dry_run": true, "would_succeed": true}));
                     } else {
-                        out_json::print(&issue);
+                        let issue = cmd_issue::reopen(&db, id, expect_version)?;
+                        print_issue_output(&issue, pretty_mode, quiet, &fields);
                     }
                 }
 
