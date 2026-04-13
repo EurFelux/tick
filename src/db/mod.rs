@@ -1,4 +1,5 @@
 pub mod comments;
+pub mod config;
 pub mod issues;
 pub mod links;
 pub mod migrate;
@@ -165,5 +166,19 @@ impl Database {
 
     pub fn get_depended_by_ids(&self, issue_id: i64) -> Result<Vec<i64>> {
         links::get_depended_by_ids(&self.conn, issue_id)
+    }
+
+    // Config methods
+
+    pub fn config_set(&self, key: &str, value: &str) -> Result<()> {
+        config::set(&self.conn, key, value)
+    }
+
+    pub fn config_get(&self, key: &str) -> Result<config::ConfigEntry> {
+        config::get(&self.conn, key)
+    }
+
+    pub fn config_list(&self) -> Result<Vec<config::ConfigEntry>> {
+        config::list(&self.conn)
     }
 }

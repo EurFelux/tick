@@ -1141,3 +1141,44 @@ fn test_batch_create_partial_failure() {
         .stdout(predicate::str::contains("Good issue two"))
         .stdout(predicate::str::contains("title is required"));
 }
+
+#[test]
+fn test_config_set_get_list() {
+    let (_dir, db_path) = setup();
+
+    // Set a config value
+    tick()
+        .args(["--db", &db_path, "config", "--set", "foo=bar"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"key\":\"foo\""))
+        .stdout(predicate::str::contains("\"value\":\"bar\""));
+
+    // Get the config value
+    tick()
+        .args(["--db", &db_path, "config", "--get", "foo"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"key\":\"foo\""))
+        .stdout(predicate::str::contains("\"value\":\"bar\""));
+
+    // List all config entries — should contain foo
+    tick()
+        .args(["--db", &db_path, "config", "--list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("foo"))
+        .stdout(predicate::str::contains("bar"));
+}
+
+#[test]
+fn test_config_get_nonexistent() {
+    let (_dir, db_path) = setup();
+
+    tick()
+        .args(["--db", &db_path, "config", "--get", "nope"])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains("NOT_FOUND"));
+}

@@ -4,7 +4,7 @@ use serde_json::json;
 use tick::cli::comment::CommentCommands;
 use tick::cli::issue::IssueCommands;
 use tick::cli::{Cli, Commands};
-use tick::commands::{comment as cmd_comment, init, issue as cmd_issue};
+use tick::commands::{comment as cmd_comment, config as cmd_config, init, issue as cmd_issue};
 use tick::db::migrate;
 use tick::error::Result;
 use tick::models::Issue;
@@ -137,6 +137,21 @@ fn run(cli: Cli) -> Result<()> {
                         out_json::print(&comments);
                     }
                 }
+            }
+        }
+
+        Commands::Config(args) => {
+            let db = init::open_db(db_path)?;
+            let result = cmd_config::run(
+                &db,
+                args.set.as_deref(),
+                args.get.as_deref(),
+                args.list,
+            )?;
+            if pretty_mode {
+                pretty::print_config(&result);
+            } else {
+                out_json::print(&result);
             }
         }
 

@@ -1,8 +1,10 @@
 pub mod comment;
+pub mod config;
 pub mod issue;
 
 use clap::Parser;
 use comment::CommentCommands;
+use config::ConfigArgs;
 use issue::IssueCommands;
 
 #[derive(Parser)]
@@ -39,4 +41,5 @@ pub enum Commands {
     Issue(IssueCommands),
     #[command(subcommand)]
     Comment(CommentCommands),
+    Config(ConfigArgs),
 }

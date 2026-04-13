@@ -104,3 +104,27 @@ pub fn print_comment_list(comments: &[Comment]) {
 pub fn print_error(message: &str) {
     eprintln!("error: {}", message);
 }
+
+pub fn print_config(value: &serde_json::Value) {
+    match value {
+        serde_json::Value::Array(entries) => {
+            for entry in entries {
+                if let (Some(key), Some(val)) = (
+                    entry.get("key").and_then(|v| v.as_str()),
+                    entry.get("value").and_then(|v| v.as_str()),
+                ) {
+                    println!("{} = {}", key, val);
+                }
+            }
+        }
+        serde_json::Value::Object(map) => {
+            if let (Some(key), Some(val)) = (
+                map.get("key").and_then(|v| v.as_str()),
+                map.get("value").and_then(|v| v.as_str()),
+            ) {
+                println!("{} = {}", key, val);
+            }
+        }
+        _ => {}
+    }
+}
