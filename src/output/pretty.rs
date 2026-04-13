@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::models::{Issue, IssueDetail};
+use crate::models::{Comment, Issue, IssueDetail};
 
 pub fn print_issue(issue: &Issue) {
     println!("id: {}", issue.id);
@@ -84,6 +84,47 @@ pub fn print_status_counts(counts: &HashMap<String, i64>) {
     }
 }
 
+pub fn print_comment(comment: &Comment) {
+    println!("id: {}", comment.id);
+    println!("issue_id: {}", comment.issue_id);
+    println!("role: {}", comment.role);
+    println!("body: {}", comment.body);
+    println!("created_at: {}", comment.created_at);
+}
+
+pub fn print_comment_list(comments: &[Comment]) {
+    for c in comments {
+        println!("[{}] {}: {}", c.created_at, c.role, c.body);
+    }
+    if comments.is_empty() {
+        println!("(no comments)");
+    }
+}
+
 pub fn print_error(message: &str) {
     eprintln!("error: {}", message);
+}
+
+pub fn print_config(value: &serde_json::Value) {
+    match value {
+        serde_json::Value::Array(entries) => {
+            for entry in entries {
+                if let (Some(key), Some(val)) = (
+                    entry.get("key").and_then(|v| v.as_str()),
+                    entry.get("value").and_then(|v| v.as_str()),
+                ) {
+                    println!("{} = {}", key, val);
+                }
+            }
+        }
+        serde_json::Value::Object(map) => {
+            if let (Some(key), Some(val)) = (
+                map.get("key").and_then(|v| v.as_str()),
+                map.get("value").and_then(|v| v.as_str()),
+            ) {
+                println!("{} = {}", key, val);
+            }
+        }
+        _ => {}
+    }
 }

@@ -1,6 +1,8 @@
+use std::collections::VecDeque;
+
 use crate::db::Database;
 use crate::error::{Result, TickError};
-use crate::models::{IssueStatus, Resolution};
+use crate::models::{CommentRole, IssueStatus, Resolution};
 
 /// Validate that an issue can be started:
 /// - branch must be non-empty
@@ -82,6 +84,99 @@ pub fn validate_parent_no_cycle(db: &Database, issue_id: i64, new_parent_id: i64
                 current_id = pid;
             }
         }
+    }
+
+    Ok(())
+}
+
+/// Validate that a dependency link can be created from from_id to to_id:
+/// - no self-reference
+/// - no cycle (BFS from to_id following depends-on, reject if from_id is reached)
+/// - to_id must not already be closed (wontfix)
+pub fn validate_link(db: &Database, from_id: i64, to_id: i64) -> Result<()> {
+    if from_id == to_id {
+        return Err(TickError::InvalidArgument(format!(
+            "issue #{from_id} cannot depend on itself"
+        )));
+    }
+
+    check_dependency_cycle(db, from_id, to_id)?;
+
+    // If from issue is non-open, the to issue must be closed(resolved)
+    let from_issue = db.get_issue(from_id)?;
+    if from_issue.status != IssueStatus::Open {
+        let to_issue = db.get_issue(to_id)?;
+        if to_issue.status != IssueStatus::Closed
+            || to_issue.resolution != Some(Resolution::Resolved)
+        {
+            return Err(TickError::InvalidArgument(format!(
+                "issue #{from_id} is '{}': dependency #{to_id} must be closed(resolved)",
+                from_issue.status
+            )));
+        }
+    }
+
+    Ok(())
+}
+
+/// BFS from to_id following depends-on links; if from_id is reached, a cycle would be created.
+pub fn check_dependency_cycle(db: &Database, from_id: i64, to_id: i64) -> Result<()> {
+    let mut visited = std::collections::HashSet::new();
+    let mut queue = VecDeque::new();
+    queue.push_back(to_id);
+
+    while let Some(current_id) = queue.pop_front() {
+        if current_id == from_id {
+            return Err(TickError::InvalidArgument(format!(
+                "linking #{from_id} → #{to_id} would create a dependency cycle"
+            )));
+        }
+        if visited.contains(&current_id) {
+            continue;
+        }
+        visited.insert(current_id);
+
+        let (depends_on, _) = db.list_links(current_id)?;
+        for dep in depends_on {
+            queue.push_back(dep.id);
+        }
+    }
+
+    Ok(())
+}
+
+/// Recursively close all issues that depend on `wontfixed_issue_id` with wontfix,
+/// adding a system comment explaining the cascade.
+pub fn cascade_wontfix(db: &Database, wontfixed_issue_id: i64) -> Result<()> {
+    let depended_by_ids = db.get_depended_by_ids(wontfixed_issue_id)?;
+
+    for dep_id in depended_by_ids {
+        let dep = db.get_issue(dep_id)?;
+        if dep.status == IssueStatus::Closed {
+            // Already closed, skip
+            continue;
+        }
+
+        // Force close with wontfix (works from any non-closed status)
+        db.update_issue_status_atomic(
+            dep_id,
+            &dep.status,
+            &IssueStatus::Closed,
+            Some(Some(&Resolution::Wontfix)),
+            None,
+            false,
+            false,
+            None,
+        )?;
+
+        db.create_comment(
+            dep_id,
+            &format!("Closed by cascade: dependency #{wontfixed_issue_id} was abandoned"),
+            &CommentRole::System,
+        )?;
+
+        // Recurse
+        cascade_wontfix(db, dep_id)?;
     }
 
     Ok(())

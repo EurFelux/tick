@@ -2,10 +2,13 @@ use rusqlite::Connection;
 
 use crate::error::{Result, TickError};
 
-const MIGRATION_001: &str = include_str!("../../migrations/001_init.sql");
+const MIGRATIONS: &[(&str, &str)] = &[
+    ("001_init", include_str!("../../migrations/001_init.sql")),
+    ("002_fts", include_str!("../../migrations/002_fts.sql")),
+];
 
 pub fn expected_version() -> i64 {
-    1
+    MIGRATIONS.len() as i64
 }
 
 pub fn schema_version(conn: &Connection) -> Result<i64> {
@@ -34,36 +37,44 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         return Ok(());
     }
 
-    // Apply migration 001
-    if current < 1 {
-        // We need to run 001, but schema_version might already have been created
-        // So we run only the parts of 001 that don't include schema_version creation
-        // Actually, run the full migration but skip schema_version creation since it exists
-        apply_migration_001(conn)?;
+    for (idx, (name, sql)) in MIGRATIONS.iter().enumerate() {
+        let migration_version = (idx + 1) as i64;
+        if migration_version <= current {
+            continue;
+        }
+        apply_migration(conn, sql, name)?;
         conn.execute(
             "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
-            rusqlite::params![1i64],
+            rusqlite::params![migration_version],
         )?;
     }
 
     Ok(())
 }
 
-fn apply_migration_001(conn: &Connection) -> Result<()> {
-    // Parse out and skip the schema_version CREATE TABLE since we already created it
-    // Run each statement individually, skipping the schema_version one
-    let statements: Vec<&str> = MIGRATION_001.split(';').collect();
-    for stmt in statements {
-        let trimmed = stmt.trim();
-        if trimmed.is_empty() {
+fn apply_migration(conn: &Connection, sql: &str, _name: &str) -> Result<()> {
+    // execute_batch handles multiple statements including triggers with semicolons in their body.
+    // Migration 001 includes `CREATE TABLE schema_version` (without IF NOT EXISTS) but the
+    // bootstrap already created it, so we strip that statement out.
+    // We do a line-level strip: skip from `CREATE TABLE schema_version` until the closing `);`.
+    let mut filtered_lines: Vec<&str> = Vec::new();
+    let mut skipping = false;
+    for line in sql.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("CREATE TABLE schema_version") {
+            skipping = true;
+        }
+        if skipping {
+            if trimmed.ends_with(");") {
+                skipping = false;
+            }
             continue;
         }
-        // Skip schema_version table creation since we already created it
-        if trimmed.contains("CREATE TABLE schema_version") {
-            continue;
-        }
-        conn.execute_batch(&format!("{};", trimmed))
-            .map_err(TickError::Db)?;
+        filtered_lines.push(line);
+    }
+    let filtered = filtered_lines.join("\n");
+    if !filtered.trim().is_empty() {
+        conn.execute_batch(&filtered).map_err(TickError::Db)?;
     }
     Ok(())
 }

@@ -1,4 +1,4 @@
-use rusqlite::{Connection, Row};
+use rusqlite::{params, Connection, Row};
 
 use crate::error::{Result, TickError};
 use crate::models::{Issue, IssueStatus, IssueSummary, IssueType, Priority, Resolution};
@@ -24,7 +24,8 @@ fn row_to_issue(row: &Row) -> rusqlite::Result<Issue> {
     let status: IssueStatus = status_str.parse().expect("invalid status in DB");
     let issue_type: IssueType = type_str.parse().expect("invalid type in DB");
     let priority: Priority = priority_str.parse().expect("invalid priority in DB");
-    let resolution: Option<Resolution> = resolution_str.map(|s| s.parse().expect("invalid resolution in DB"));
+    let resolution: Option<Resolution> =
+        resolution_str.map(|s| s.parse().expect("invalid resolution in DB"));
 
     Ok(Issue {
         id: row.get(0)?,
@@ -181,6 +182,7 @@ pub fn list(conn: &Connection, filter: &ListFilter) -> Result<Vec<Issue>> {
     Ok(issues)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn update_fields(
     conn: &Connection,
     id: i64,
@@ -189,6 +191,7 @@ pub fn update_fields(
     issue_type: Option<&IssueType>,
     priority: Option<&Priority>,
     parent_id: Option<Option<i64>>,
+    expect_version: Option<i64>,
 ) -> Result<Issue> {
     let mut sets: Vec<String> = Vec::new();
     let mut param_values: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
@@ -234,23 +237,50 @@ pub fn update_fields(
     sets.push("version = version + 1".to_string());
     sets.push("updated_at = datetime('now', 'utc')".to_string());
 
-    let sql = format!(
-        "UPDATE issues SET {} WHERE id = ?{}",
-        sets.join(", "),
-        param_idx
-    );
-
-    param_values.push(Box::new(id));
+    let sql = if let Some(ver) = expect_version {
+        let s = format!(
+            "UPDATE issues SET {} WHERE id = ?{} AND version = ?{}",
+            sets.join(", "),
+            param_idx,
+            param_idx + 1
+        );
+        param_values.push(Box::new(id));
+        param_values.push(Box::new(ver));
+        s
+    } else {
+        let s = format!(
+            "UPDATE issues SET {} WHERE id = ?{}",
+            sets.join(", "),
+            param_idx
+        );
+        param_values.push(Box::new(id));
+        s
+    };
 
     let params_refs: Vec<&dyn rusqlite::types::ToSql> =
         param_values.iter().map(|v| v.as_ref()).collect();
     let affected = conn.execute(&sql, params_refs.as_slice())?;
 
     if affected == 0 {
-        return Err(TickError::NotFound(format!("issue {} not found", id)));
+        match get(conn, id) {
+            Ok(existing) => {
+                if expect_version.is_some() {
+                    Err(TickError::Conflict(format!(
+                        "issue {} version conflict: actual version is {}",
+                        id, existing.version
+                    )))
+                } else {
+                    Err(TickError::NotFound(format!("issue {} not found", id)))
+                }
+            }
+            Err(TickError::NotFound(_)) => {
+                Err(TickError::NotFound(format!("issue {} not found", id)))
+            }
+            Err(e) => Err(e),
+        }
+    } else {
+        get(conn, id)
     }
-
-    get(conn, id)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -263,6 +293,7 @@ pub fn update_status_atomic(
     branch: Option<Option<&str>>,
     clear_branch: bool,
     clear_resolution: bool,
+    expect_version: Option<i64>,
 ) -> Result<Issue> {
     let mut sets: Vec<String> = Vec::new();
     let mut param_values: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
@@ -297,15 +328,29 @@ pub fn update_status_atomic(
     sets.push("version = version + 1".to_string());
     sets.push("updated_at = datetime('now', 'utc')".to_string());
 
-    let sql = format!(
-        "UPDATE issues SET {} WHERE id = ?{} AND status = ?{}",
-        sets.join(", "),
-        param_idx,
-        param_idx + 1
-    );
-
-    param_values.push(Box::new(id));
-    param_values.push(Box::new(expected_status.to_string()));
+    let sql = if let Some(ver) = expect_version {
+        let s = format!(
+            "UPDATE issues SET {} WHERE id = ?{} AND status = ?{} AND version = ?{}",
+            sets.join(", "),
+            param_idx,
+            param_idx + 1,
+            param_idx + 2
+        );
+        param_values.push(Box::new(id));
+        param_values.push(Box::new(expected_status.to_string()));
+        param_values.push(Box::new(ver));
+        s
+    } else {
+        let s = format!(
+            "UPDATE issues SET {} WHERE id = ?{} AND status = ?{}",
+            sets.join(", "),
+            param_idx,
+            param_idx + 1
+        );
+        param_values.push(Box::new(id));
+        param_values.push(Box::new(expected_status.to_string()));
+        s
+    };
 
     let params_refs: Vec<&dyn rusqlite::types::ToSql> =
         param_values.iter().map(|v| v.as_ref()).collect();
@@ -314,10 +359,19 @@ pub fn update_status_atomic(
     if affected == 0 {
         // Check if issue exists
         match get(conn, id) {
-            Ok(_) => Err(TickError::Conflict(format!(
-                "issue {} status conflict: expected {}",
-                id, expected_status
-            ))),
+            Ok(existing) => {
+                if expect_version.is_some() && existing.status == *expected_status {
+                    Err(TickError::Conflict(format!(
+                        "issue {} version conflict: actual version is {}",
+                        id, existing.version
+                    )))
+                } else {
+                    Err(TickError::Conflict(format!(
+                        "issue {} status conflict: expected {}",
+                        id, expected_status
+                    )))
+                }
+            }
             Err(TickError::NotFound(_)) => {
                 Err(TickError::NotFound(format!("issue {} not found", id)))
             }
@@ -326,6 +380,21 @@ pub fn update_status_atomic(
     } else {
         get(conn, id)
     }
+}
+
+pub fn search(conn: &Connection, query: &str, limit: i64, offset: i64) -> Result<Vec<Issue>> {
+    let mut stmt = conn.prepare(
+        "SELECT i.id, i.parent_id, i.title, i.description, i.type, i.status, i.priority, i.resolution, i.branch, i.version, i.created_at, i.updated_at
+         FROM issues i
+         JOIN issues_fts fts ON i.id = fts.rowid
+         WHERE issues_fts MATCH ?1
+         ORDER BY rank
+         LIMIT ?2 OFFSET ?3",
+    )?;
+    let issues = stmt
+        .query_map(params![query, limit, offset], row_to_issue)?
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    Ok(issues)
 }
 
 pub fn count_by_status(conn: &Connection) -> Result<std::collections::HashMap<String, i64>> {

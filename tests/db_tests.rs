@@ -14,7 +14,7 @@ fn setup_db() -> (TempDir, Database) {
 fn test_open_and_migrate() {
     let (_dir, db) = setup_db();
     let version = db.schema_version().expect("failed to get schema version");
-    assert_eq!(version, 1);
+    assert_eq!(version, 2);
 }
 
 #[test]
@@ -25,7 +25,7 @@ fn test_migrate_is_idempotent() {
     db.migrate().expect("failed to migrate first time");
     db.migrate().expect("failed to migrate second time");
     let version = db.schema_version().expect("failed to get schema version");
-    assert_eq!(version, 1);
+    assert_eq!(version, 2);
 }
 
 #[test]
@@ -190,7 +190,7 @@ fn test_create_and_list_comments() {
         .create_comment(issue_id, "Second comment by worker", &CommentRole::Worker)
         .expect("create comment 2");
 
-    let comments = db.list_comments(issue_id).expect("list comments");
+    let comments = db.list_comments(issue_id, None).expect("list comments");
     assert_eq!(comments.len(), 2);
 
     assert_eq!(comments[0].id, comment1_id);

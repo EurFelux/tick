@@ -1,4 +1,5 @@
 pub mod comments;
+pub mod config;
 pub mod issues;
 pub mod links;
 pub mod migrate;
@@ -83,6 +84,7 @@ impl Database {
         issues::get_summary(&self.conn, id)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn update_issue_fields(
         &self,
         id: i64,
@@ -91,6 +93,7 @@ impl Database {
         issue_type: Option<&IssueType>,
         priority: Option<&Priority>,
         parent_id: Option<Option<i64>>,
+        expect_version: Option<i64>,
     ) -> Result<Issue> {
         issues::update_fields(
             &self.conn,
@@ -100,6 +103,7 @@ impl Database {
             issue_type,
             priority,
             parent_id,
+            expect_version,
         )
     }
 
@@ -113,6 +117,7 @@ impl Database {
         branch: Option<Option<&str>>,
         clear_branch: bool,
         clear_resolution: bool,
+        expect_version: Option<i64>,
     ) -> Result<Issue> {
         issues::update_status_atomic(
             &self.conn,
@@ -123,11 +128,16 @@ impl Database {
             branch,
             clear_branch,
             clear_resolution,
+            expect_version,
         )
     }
 
     pub fn count_by_status(&self) -> Result<HashMap<String, i64>> {
         issues::count_by_status(&self.conn)
+    }
+
+    pub fn search_issues(&self, query: &str, limit: i64, offset: i64) -> Result<Vec<Issue>> {
+        issues::search(&self.conn, query, limit, offset)
     }
 
     // Comment methods
@@ -136,13 +146,39 @@ impl Database {
         comments::create(&self.conn, issue_id, body, role)
     }
 
-    pub fn list_comments(&self, issue_id: i64) -> Result<Vec<Comment>> {
-        comments::list_by_issue(&self.conn, issue_id)
+    pub fn list_comments(&self, issue_id: i64, role: Option<&CommentRole>) -> Result<Vec<Comment>> {
+        comments::list_by_issue(&self.conn, issue_id, role)
     }
 
     // Link methods
 
     pub fn list_links(&self, issue_id: i64) -> Result<(Vec<IssueSummary>, Vec<IssueSummary>)> {
         links::list_by_issue(&self.conn, issue_id)
+    }
+
+    pub fn create_link(&self, from_id: i64, to_id: i64) -> Result<()> {
+        links::create(&self.conn, from_id, to_id)
+    }
+
+    pub fn delete_link(&self, from_id: i64, to_id: i64) -> Result<()> {
+        links::delete(&self.conn, from_id, to_id)
+    }
+
+    pub fn get_depended_by_ids(&self, issue_id: i64) -> Result<Vec<i64>> {
+        links::get_depended_by_ids(&self.conn, issue_id)
+    }
+
+    // Config methods
+
+    pub fn config_set(&self, key: &str, value: &str) -> Result<()> {
+        config::set(&self.conn, key, value)
+    }
+
+    pub fn config_get(&self, key: &str) -> Result<config::ConfigEntry> {
+        config::get(&self.conn, key)
+    }
+
+    pub fn config_list(&self) -> Result<Vec<config::ConfigEntry>> {
+        config::list(&self.conn)
     }
 }

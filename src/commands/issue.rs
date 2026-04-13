@@ -73,7 +73,7 @@ pub fn show(db: &Database, id: i64) -> Result<IssueDetail> {
 
     let children = db.get_children(id)?;
     let (depends_on, depended_by) = db.list_links(id)?;
-    let comments = db.list_comments(id)?;
+    let comments = db.list_comments(id, None)?;
 
     Ok(IssueDetail {
         issue,
@@ -85,6 +85,7 @@ pub fn show(db: &Database, id: i64) -> Result<IssueDetail> {
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn update(
     db: &Database,
     id: i64,
@@ -93,6 +94,7 @@ pub fn update(
     issue_type: Option<&str>,
     priority: Option<&str>,
     parent_id: Option<i64>,
+    expect_version: Option<i64>,
 ) -> Result<Issue> {
     let itype = issue_type
         .map(|s| s.parse::<IssueType>().map_err(TickError::InvalidArgument))
@@ -119,10 +121,11 @@ pub fn update(
         itype.as_ref(),
         prio.as_ref(),
         parent_opt,
+        expect_version,
     )
 }
 
-pub fn start(db: &Database, id: i64, branch: &str) -> Result<Issue> {
+pub fn start(db: &Database, id: i64, branch: &str, expect_version: Option<i64>) -> Result<Issue> {
     validators::validate_start(db, id, branch)?;
     db.update_issue_status_atomic(
         id,
@@ -132,10 +135,11 @@ pub fn start(db: &Database, id: i64, branch: &str) -> Result<Issue> {
         Some(Some(branch)),
         false,
         false,
+        expect_version,
     )
 }
 
-pub fn done(db: &Database, id: i64) -> Result<Issue> {
+pub fn done(db: &Database, id: i64, expect_version: Option<i64>) -> Result<Issue> {
     db.update_issue_status_atomic(
         id,
         &IssueStatus::InProgress,
@@ -144,6 +148,7 @@ pub fn done(db: &Database, id: i64) -> Result<Issue> {
         None,
         false,
         false,
+        expect_version,
     )
 }
 
@@ -153,6 +158,7 @@ pub fn close(
     comment: Option<&str>,
     role: &str,
     resolution: &str,
+    expect_version: Option<i64>,
 ) -> Result<Issue> {
     let res = resolution
         .parse::<Resolution>()
@@ -172,16 +178,44 @@ pub fn close(
         None,
         false,
         false,
+        expect_version,
     )?;
 
     if let Some(body) = comment {
         db.create_comment(id, body, &crole)?;
     }
 
+    if res == Resolution::Wontfix {
+        validators::cascade_wontfix(db, id)?;
+    }
+
     Ok(updated)
 }
 
-pub fn reopen(db: &Database, id: i64) -> Result<Issue> {
+pub fn search(db: &Database, query: &str, limit: i64, offset: i64) -> Result<Vec<Issue>> {
+    db.search_issues(query, limit, offset)
+}
+
+pub fn link(db: &Database, from_id: i64, relation: &str, to_id: i64) -> Result<serde_json::Value> {
+    if relation != "depends-on" {
+        return Err(TickError::InvalidArgument(format!(
+            "unknown relation '{}', only 'depends-on' is supported",
+            relation
+        )));
+    }
+    db.get_issue(from_id)?;
+    db.get_issue(to_id)?;
+    validators::validate_link(db, from_id, to_id)?;
+    db.create_link(from_id, to_id)?;
+    Ok(serde_json::json!({"linked": true, "from": from_id, "to": to_id, "relation": "depends-on"}))
+}
+
+pub fn unlink(db: &Database, from_id: i64, to_id: i64) -> Result<serde_json::Value> {
+    db.delete_link(from_id, to_id)?;
+    Ok(serde_json::json!({"unlinked": true, "from": from_id, "to": to_id}))
+}
+
+pub fn reopen(db: &Database, id: i64, expect_version: Option<i64>) -> Result<Issue> {
     db.update_issue_status_atomic(
         id,
         &IssueStatus::Closed,
@@ -190,5 +224,61 @@ pub fn reopen(db: &Database, id: i64) -> Result<Issue> {
         None,
         true,
         true,
+        expect_version,
     )
+}
+
+pub fn batch_create(db: &Database) -> Result<(Vec<serde_json::Value>, bool)> {
+    use std::io::BufRead;
+    let stdin = std::io::stdin();
+    let mut results = Vec::new();
+    let mut has_error = false;
+
+    for (i, line) in stdin.lock().lines().enumerate() {
+        let line = match line {
+            Ok(l) => l,
+            Err(e) => {
+                results.push(serde_json::json!({"error": format!("stdin read error: {e}"), "code": "INTERNAL_ERROR", "line": i + 1}));
+                has_error = true;
+                continue;
+            }
+        };
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        match serde_json::from_str::<serde_json::Value>(&line) {
+            Ok(obj) => {
+                let title = obj.get("title").and_then(|v| v.as_str()).unwrap_or("");
+                if title.is_empty() {
+                    results.push(serde_json::json!({"error": "title is required", "code": "INVALID_ARGUMENT", "line": i + 1}));
+                    has_error = true;
+                    continue;
+                }
+                let desc = obj.get("description").and_then(|v| v.as_str());
+                let itype = obj
+                    .get("type")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("feature");
+                let prio = obj
+                    .get("priority")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("medium");
+                let parent = obj.get("parent").and_then(|v| v.as_i64());
+
+                match create(db, title, desc, itype, prio, parent) {
+                    Ok(issue) => results.push(serde_json::to_value(&issue).unwrap()),
+                    Err(e) => {
+                        results.push(serde_json::json!({"error": e.to_string(), "code": e.error_code(), "line": i + 1}));
+                        has_error = true;
+                    }
+                }
+            }
+            Err(e) => {
+                results.push(serde_json::json!({"error": format!("invalid JSON: {e}"), "code": "INVALID_ARGUMENT", "line": i + 1}));
+                has_error = true;
+            }
+        }
+    }
+    Ok((results, has_error))
 }
