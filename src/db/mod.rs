@@ -9,7 +9,9 @@ use std::path::Path;
 use rusqlite::Connection;
 
 use crate::error::Result;
-use crate::models::{Comment, CommentRole, Issue, IssueSummary, IssueStatus, IssueType, Priority, Resolution};
+use crate::models::{
+    Comment, CommentRole, Issue, IssueStatus, IssueSummary, IssueType, Priority, Resolution,
+};
 
 pub use issues::ListFilter;
 
@@ -22,11 +24,13 @@ impl Database {
         let conn = Connection::open(path)?;
 
         // Set pragmas
-        conn.execute_batch("
+        conn.execute_batch(
+            "
             PRAGMA journal_mode = WAL;
             PRAGMA busy_timeout = 5000;
             PRAGMA foreign_keys = ON;
-        ")?;
+        ",
+        )?;
 
         Ok(Database { conn })
     }
@@ -53,7 +57,14 @@ impl Database {
         priority: &Priority,
         parent_id: Option<i64>,
     ) -> Result<i64> {
-        issues::create(&self.conn, title, description, issue_type, priority, parent_id)
+        issues::create(
+            &self.conn,
+            title,
+            description,
+            issue_type,
+            priority,
+            parent_id,
+        )
     }
 
     pub fn get_issue(&self, id: i64) -> Result<Issue> {
@@ -81,9 +92,18 @@ impl Database {
         priority: Option<&Priority>,
         parent_id: Option<Option<i64>>,
     ) -> Result<Issue> {
-        issues::update_fields(&self.conn, id, title, description, issue_type, priority, parent_id)
+        issues::update_fields(
+            &self.conn,
+            id,
+            title,
+            description,
+            issue_type,
+            priority,
+            parent_id,
+        )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn update_issue_status_atomic(
         &self,
         id: i64,
@@ -112,12 +132,7 @@ impl Database {
 
     // Comment methods
 
-    pub fn create_comment(
-        &self,
-        issue_id: i64,
-        body: &str,
-        role: &CommentRole,
-    ) -> Result<i64> {
+    pub fn create_comment(&self, issue_id: i64, body: &str, role: &CommentRole) -> Result<i64> {
         comments::create(&self.conn, issue_id, body, role)
     }
 

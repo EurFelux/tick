@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 
 use crate::error::{Result, TickError};
-use crate::models::{IssueSummary, IssueStatus};
+use crate::models::{IssueStatus, IssueSummary};
 
 pub fn list_by_issue(
     conn: &Connection,
@@ -50,8 +50,9 @@ fn query_linked_summaries(
     let mut summaries = Vec::new();
     for row in rows {
         let (id, title, status_str) = row?;
-        let status = status_str.parse::<IssueStatus>()
-            .map_err(|e| TickError::InvalidArgument(e))?;
+        let status = status_str
+            .parse::<IssueStatus>()
+            .map_err(TickError::InvalidArgument)?;
         summaries.push(IssueSummary { id, title, status });
     }
     Ok(summaries)

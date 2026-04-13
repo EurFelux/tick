@@ -15,10 +15,10 @@ pub fn create(
 ) -> Result<Issue> {
     let itype = issue_type
         .parse::<IssueType>()
-        .map_err(|e| TickError::InvalidArgument(e))?;
+        .map_err(TickError::InvalidArgument)?;
     let prio = priority
         .parse::<Priority>()
-        .map_err(|e| TickError::InvalidArgument(e))?;
+        .map_err(TickError::InvalidArgument)?;
 
     // Validate parent exists if specified
     if let Some(pid) = parent_id {
@@ -29,6 +29,7 @@ pub fn create(
     db.get_issue(id)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn list(
     db: &Database,
     status: Option<&str>,
@@ -40,13 +41,13 @@ pub fn list(
     offset: i64,
 ) -> Result<Vec<Issue>> {
     let status = status
-        .map(|s| s.parse::<IssueStatus>().map_err(|e| TickError::InvalidArgument(e)))
+        .map(|s| s.parse::<IssueStatus>().map_err(TickError::InvalidArgument))
         .transpose()?;
     let itype = issue_type
-        .map(|s| s.parse::<IssueType>().map_err(|e| TickError::InvalidArgument(e)))
+        .map(|s| s.parse::<IssueType>().map_err(TickError::InvalidArgument))
         .transpose()?;
     let prio = priority
-        .map(|s| s.parse::<Priority>().map_err(|e| TickError::InvalidArgument(e)))
+        .map(|s| s.parse::<Priority>().map_err(TickError::InvalidArgument))
         .transpose()?;
 
     let filter = ListFilter {
@@ -94,10 +95,10 @@ pub fn update(
     parent_id: Option<i64>,
 ) -> Result<Issue> {
     let itype = issue_type
-        .map(|s| s.parse::<IssueType>().map_err(|e| TickError::InvalidArgument(e)))
+        .map(|s| s.parse::<IssueType>().map_err(TickError::InvalidArgument))
         .transpose()?;
     let prio = priority
-        .map(|s| s.parse::<Priority>().map_err(|e| TickError::InvalidArgument(e)))
+        .map(|s| s.parse::<Priority>().map_err(TickError::InvalidArgument))
         .transpose()?;
 
     // Validate parent cycle if parent is being changed
@@ -109,9 +110,16 @@ pub fn update(
     // We need to wrap it: Some(None) = "clear parent", Some(Some(x)) = "set parent to x"
     // But the CLI doesn't support clearing parent, so if parent_id is provided we set it,
     // otherwise we pass None (no change).
-    let parent_opt: Option<Option<i64>> = parent_id.map(|pid| Some(pid));
+    let parent_opt: Option<Option<i64>> = parent_id.map(Some);
 
-    db.update_issue_fields(id, title, description, itype.as_ref(), prio.as_ref(), parent_opt)
+    db.update_issue_fields(
+        id,
+        title,
+        description,
+        itype.as_ref(),
+        prio.as_ref(),
+        parent_opt,
+    )
 }
 
 pub fn start(db: &Database, id: i64, branch: &str) -> Result<Issue> {
@@ -148,10 +156,10 @@ pub fn close(
 ) -> Result<Issue> {
     let res = resolution
         .parse::<Resolution>()
-        .map_err(|e| TickError::InvalidArgument(e))?;
+        .map_err(TickError::InvalidArgument)?;
     let crole = role
         .parse::<CommentRole>()
-        .map_err(|e| TickError::InvalidArgument(e))?;
+        .map_err(TickError::InvalidArgument)?;
 
     let issue = db.get_issue(id)?;
     validators::validate_close_resolution(&issue.status, &res)?;

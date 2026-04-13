@@ -25,7 +25,7 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
             applied_at TEXT NOT NULL DEFAULT (datetime('now', 'utc'))
         );",
     )
-    .map_err(|e| TickError::Db(e))?;
+    .map_err(TickError::Db)?;
 
     let current = schema_version(conn)?;
     let expected = expected_version();
@@ -63,7 +63,7 @@ fn apply_migration_001(conn: &Connection) -> Result<()> {
             continue;
         }
         conn.execute_batch(&format!("{};", trimmed))
-            .map_err(|e| TickError::Db(e))?;
+            .map_err(TickError::Db)?;
     }
     Ok(())
 }

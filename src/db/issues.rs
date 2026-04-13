@@ -1,7 +1,7 @@
 use rusqlite::{Connection, Row};
 
 use crate::error::{Result, TickError};
-use crate::models::{Issue, IssueSummary, IssueStatus, IssueType, Priority, Resolution};
+use crate::models::{Issue, IssueStatus, IssueSummary, IssueType, Priority, Resolution};
 
 #[derive(Debug, Default)]
 pub struct ListFilter {
@@ -20,14 +20,20 @@ fn row_to_issue(row: &Row) -> rusqlite::Result<Issue> {
     let priority_str: String = row.get(6)?;
     let resolution_str: Option<String> = row.get(7)?;
 
-    let status = status_str.parse::<IssueStatus>()
-        .map_err(|e| rusqlite::Error::InvalidColumnName(e))?;
-    let issue_type = type_str.parse::<IssueType>()
-        .map_err(|e| rusqlite::Error::InvalidColumnName(e))?;
-    let priority = priority_str.parse::<Priority>()
-        .map_err(|e| rusqlite::Error::InvalidColumnName(e))?;
+    let status = status_str
+        .parse::<IssueStatus>()
+        .map_err(rusqlite::Error::InvalidColumnName)?;
+    let issue_type = type_str
+        .parse::<IssueType>()
+        .map_err(rusqlite::Error::InvalidColumnName)?;
+    let priority = priority_str
+        .parse::<Priority>()
+        .map_err(rusqlite::Error::InvalidColumnName)?;
     let resolution = resolution_str
-        .map(|s| s.parse::<Resolution>().map_err(|e| rusqlite::Error::InvalidColumnName(e)))
+        .map(|s| {
+            s.parse::<Resolution>()
+                .map_err(rusqlite::Error::InvalidColumnName)
+        })
         .transpose()?;
 
     Ok(Issue {
@@ -93,8 +99,9 @@ pub fn get_summary(conn: &Connection, id: i64) -> Result<IssueSummary> {
     );
     match result {
         Ok((id, title, status_str)) => {
-            let status = status_str.parse::<IssueStatus>()
-                .map_err(|e| TickError::InvalidArgument(e))?;
+            let status = status_str
+                .parse::<IssueStatus>()
+                .map_err(TickError::InvalidArgument)?;
             Ok(IssueSummary { id, title, status })
         }
         Err(rusqlite::Error::QueryReturnedNoRows) => {
@@ -105,9 +112,8 @@ pub fn get_summary(conn: &Connection, id: i64) -> Result<IssueSummary> {
 }
 
 pub fn get_children(conn: &Connection, parent_id: i64) -> Result<Vec<IssueSummary>> {
-    let mut stmt = conn.prepare(
-        "SELECT id, title, status FROM issues WHERE parent_id = ?1 ORDER BY id"
-    )?;
+    let mut stmt =
+        conn.prepare("SELECT id, title, status FROM issues WHERE parent_id = ?1 ORDER BY id")?;
     let rows = stmt.query_map(rusqlite::params![parent_id], |row| {
         let status_str: String = row.get(2)?;
         Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?, status_str))
@@ -116,8 +122,9 @@ pub fn get_children(conn: &Connection, parent_id: i64) -> Result<Vec<IssueSummar
     let mut summaries = Vec::new();
     for row in rows {
         let (id, title, status_str) = row?;
-        let status = status_str.parse::<IssueStatus>()
-            .map_err(|e| TickError::InvalidArgument(e))?;
+        let status = status_str
+            .parse::<IssueStatus>()
+            .map_err(TickError::InvalidArgument)?;
         summaries.push(IssueSummary { id, title, status });
     }
     Ok(summaries)
@@ -171,7 +178,8 @@ pub fn list(conn: &Connection, filter: &ListFilter) -> Result<Vec<Issue>> {
     param_values.push(Box::new(limit));
     param_values.push(Box::new(offset));
 
-    let params_refs: Vec<&dyn rusqlite::types::ToSql> = param_values.iter().map(|v| v.as_ref()).collect();
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        param_values.iter().map(|v| v.as_ref()).collect();
 
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt.query_map(params_refs.as_slice(), row_to_issue)?;
@@ -233,8 +241,8 @@ pub fn update_fields(
         return get(conn, id);
     }
 
-    sets.push(format!("version = version + 1"));
-    sets.push(format!("updated_at = datetime('now', 'utc')"));
+    sets.push("version = version + 1".to_string());
+    sets.push("updated_at = datetime('now', 'utc')".to_string());
 
     let sql = format!(
         "UPDATE issues SET {} WHERE id = ?{}",
@@ -244,7 +252,8 @@ pub fn update_fields(
 
     param_values.push(Box::new(id));
 
-    let params_refs: Vec<&dyn rusqlite::types::ToSql> = param_values.iter().map(|v| v.as_ref()).collect();
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        param_values.iter().map(|v| v.as_ref()).collect();
     let affected = conn.execute(&sql, params_refs.as_slice())?;
 
     if affected == 0 {
@@ -254,6 +263,7 @@ pub fn update_fields(
     get(conn, id)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn update_status_atomic(
     conn: &Connection,
     id: i64,
@@ -307,7 +317,8 @@ pub fn update_status_atomic(
     param_values.push(Box::new(id));
     param_values.push(Box::new(expected_status.to_string()));
 
-    let params_refs: Vec<&dyn rusqlite::types::ToSql> = param_values.iter().map(|v| v.as_ref()).collect();
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        param_values.iter().map(|v| v.as_ref()).collect();
     let affected = conn.execute(&sql, params_refs.as_slice())?;
 
     if affected == 0 {
@@ -317,7 +328,9 @@ pub fn update_status_atomic(
                 "issue {} status conflict: expected {}",
                 id, expected_status
             ))),
-            Err(TickError::NotFound(_)) => Err(TickError::NotFound(format!("issue {} not found", id))),
+            Err(TickError::NotFound(_)) => {
+                Err(TickError::NotFound(format!("issue {} not found", id)))
+            }
             Err(e) => Err(e),
         }
     } else {
@@ -326,9 +339,7 @@ pub fn update_status_atomic(
 }
 
 pub fn count_by_status(conn: &Connection) -> Result<std::collections::HashMap<String, i64>> {
-    let mut stmt = conn.prepare(
-        "SELECT status, COUNT(*) FROM issues GROUP BY status"
-    )?;
+    let mut stmt = conn.prepare("SELECT status, COUNT(*) FROM issues GROUP BY status")?;
     let rows = stmt.query_map([], |row| {
         Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
     })?;
